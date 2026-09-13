@@ -6,6 +6,7 @@ class FakeUtterance {
   voice: { lang: string; name: string } | null = null;
   rate = 1;
   pitch = 1;
+  volume = 1;
   onend: (() => void) | null = null;
   onerror: (() => void) | null = null;
   constructor(public text: string) {}
@@ -157,5 +158,67 @@ describe('resilience', () => {
       utteranceCtor: FakeUtterance as unknown as new (text: string) => FakeUtterance,
     });
     expect(() => tts.cancel()).not.toThrow();
+  });
+});
+
+describe('priming for mobile browsers', () => {
+  it('speaks a silent utterance so later replies are allowed through', () => {
+    // Android Chrome refuses to speak unless the page already spoke from a real tap.
+    const { tts, spoken } = makeService();
+    tts.prime();
+
+    expect(spoken).toHaveLength(1);
+    expect(spoken[0]?.volume).toBe(0);
+  });
+
+  it('primes only once, however many times it is called', () => {
+    const { tts, spoken } = makeService();
+    tts.prime();
+    tts.prime();
+    tts.prime();
+    expect(spoken).toHaveLength(1);
+  });
+
+  it('speaks a real reply at full volume after priming', () => {
+    const { tts, spoken } = makeService();
+    tts.prime();
+    tts.speak('קבעתי פגישה');
+
+    expect(spoken[1]?.volume).toBe(1);
+    expect(spoken[1]?.text).toBe('קבעתי פגישה');
+  });
+
+  it('does nothing when speech is unsupported', () => {
+    const tts = createTtsService({ synth: undefined, utteranceCtor: undefined });
+    expect(() => tts.prime()).not.toThrow();
+  });
+});
+
+describe('voices that load late', () => {
+  it('picks up a Hebrew voice that only appears after startup', () => {
+    // getVoices() commonly returns nothing on the first call.
+    const voices: Array<{ lang: string; name: string }> = [];
+    const spoken: FakeUtterance[] = [];
+    let onVoicesChanged: (() => void) | undefined;
+
+    const synth: SpeechSynthesisLike = {
+      speak: (utterance) => spoken.push(utterance as unknown as FakeUtterance),
+      cancel: vi.fn(),
+      getVoices: () => voices,
+      addEventListener: (type, listener) => {
+        if (type === 'voiceschanged') onVoicesChanged = listener;
+      },
+    };
+
+    const tts = createTtsService({
+      synth,
+      utteranceCtor: FakeUtterance as unknown as new (text: string) => FakeUtterance,
+    });
+
+    voices.push({ lang: 'he-IL', name: 'Hebrew' });
+    onVoicesChanged?.();
+
+    tts.speak('שלום');
+    expect(spoken[0]?.voice?.name).toBe('Hebrew');
   });
 });

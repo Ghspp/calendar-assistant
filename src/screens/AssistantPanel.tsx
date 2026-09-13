@@ -95,6 +95,10 @@ export default function AssistantPanel() {
   })();
 
   function pressMic() {
+    // Unlock speech synthesis while we are still inside the tap. The reply arrives
+    // after an await, which mobile browsers will not accept as a user gesture.
+    if (speakReplies) tts.prime();
+
     if (speech.state === 'listening') {
       speech.stop();
       return;
@@ -106,6 +110,7 @@ export default function AssistantPanel() {
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    if (speakReplies) tts.prime();
     const text = draft;
     setDraft('');
     void assistant.send(text);
@@ -113,6 +118,8 @@ export default function AssistantPanel() {
 
   function toggleSpeech() {
     const next = !speakReplies;
+    // Turning sound on is itself a tap, so it is a good moment to unlock the engine.
+    if (next) tts.prime();
     setSpeakReplies(next);
     updatePrefs({ speakReplies: next });
     if (!next) tts.cancel();

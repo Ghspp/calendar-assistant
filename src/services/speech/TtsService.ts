@@ -20,6 +20,7 @@ interface SpeechSynthesisUtteranceLike {
   voice: SpeechSynthesisVoiceLike | null;
   rate: number;
   pitch: number;
+  volume: number;
   onend: (() => void) | null;
   onerror: (() => void) | null;
 }
@@ -37,6 +38,15 @@ export interface TtsService {
   readonly isSupported: boolean;
   speak: (text: string, options?: { lang?: string }) => void;
   cancel: () => void;
+  /**
+   * Unlock the synthesiser. MUST be called synchronously inside a user gesture.
+   *
+   * Mobile browsers — Android Chrome especially — refuse to speak unless the page has
+   * already spoken once from a real tap. Our replies arrive after an await, far away
+   * from the tap that triggered them, so without this they are silently dropped. The
+   * priming utterance is a silent space, so the user hears nothing.
+   */
+  prime: () => void;
 }
 
 export interface TtsOptions {
@@ -63,15 +73,10 @@ function findUtteranceCtor(): UtteranceConstructor | undefined {
  * some platforms, so the first utterance after a cold start may use the default voice.
  */
 function selectVoice(
-  synth: SpeechSynthesisLike,
+  available: readonly SpeechSynthesisVoiceLike[],
   lang: string,
 ): SpeechSynthesisVoiceLike | undefined {
-  let voices: SpeechSynthesisVoiceLike[];
-  try {
-    voices = synth.getVoices();
-  } catch {
-    return undefined;
-  }
+  const voices = available;
 
   const exact = voices.find((voice) => voice.lang === lang);
   if (exact !== undefined) return exact;
@@ -84,6 +89,35 @@ export function createTtsService(options: TtsOptions = {}): TtsService {
   const synth = options.synth ?? findSynth();
   const utteranceCtor = options.utteranceCtor ?? findUtteranceCtor();
   const isSupported = synth !== undefined && utteranceCtor !== undefined;
+
+  let primed = false;
+
+  // Voices arrive asynchronously on most platforms. Asking once at startup usually
+  // returns an empty list, so re-read them when the browser says they are ready.
+  let voices: SpeechSynthesisVoiceLike[] = [];
+  const refreshVoices = (): void => {
+    try {
+      voices = synth?.getVoices() ?? [];
+    } catch {
+      voices = [];
+    }
+  };
+  refreshVoices();
+  synth?.addEventListener?.('voiceschanged', refreshVoices);
+
+  function prime(): void {
+    if (primed || synth === undefined || utteranceCtor === undefined) return;
+    primed = true;
+
+    try {
+      const silent = new utteranceCtor(' ');
+      silent.volume = 0;
+      silent.lang = HEBREW_LANG;
+      synth.speak(silent);
+    } catch {
+      // If priming fails there is nothing better to try; speech simply stays silent.
+    }
+  }
 
   function speak(text: string, speakOptions?: { lang?: string }): void {
     if (synth === undefined || utteranceCtor === undefined) return;
@@ -104,8 +138,11 @@ export function createTtsService(options: TtsOptions = {}): TtsService {
     utterance.lang = lang;
     utterance.rate = 1;
     utterance.pitch = 1;
+    utterance.volume = 1;
 
-    const voice = selectVoice(synth, lang);
+    // Voices may have loaded since construction.
+    if (voices.length === 0) refreshVoices();
+    const voice = selectVoice(voices, lang);
     utterance.voice = voice ?? null;
 
     try {
@@ -123,5 +160,5 @@ export function createTtsService(options: TtsOptions = {}): TtsService {
     }
   }
 
-  return { isSupported, speak, cancel };
+  return { isSupported, speak, cancel, prime };
 }
