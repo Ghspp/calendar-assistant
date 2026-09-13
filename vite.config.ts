@@ -14,6 +14,12 @@ const base = process.env['BASE_PATH'] ?? '/';
 export default defineConfig({
   base,
 
+  define: {
+    // Stamped at build time. A PWA serves from cache, so without this there is no way
+    // to tell whether the version on screen is the one that was just deployed.
+    __BUILD_ID__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ')),
+  },
+
   plugins: [
     react(),
 

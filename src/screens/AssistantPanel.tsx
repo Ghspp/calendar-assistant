@@ -119,9 +119,31 @@ export default function AssistantPanel() {
     void assistant.send(text);
   }
 
+  /**
+   * Force the newest build.
+   *
+   * An installed PWA has no address bar, so there is no obvious way to escape a stale
+   * cached version. This asks the service worker to update and then reloads.
+   */
+  async function forceUpdate() {
+    setSoundReport('מחפש עדכון…');
+    try {
+      const registrations = await navigator.serviceWorker?.getRegistrations?.();
+      await Promise.all((registrations ?? []).map((registration) => registration.update()));
+    } catch {
+      // Even if the update check fails, a reload is still worth trying.
+    }
+    window.location.reload();
+  }
+
   function testSound() {
     // Spoken straight from the tap, so this is the best case the browser allows. If
     // this is silent too, the problem is the device rather than the app.
+    if (!tts.isSupported) {
+      setSoundReport('הדפדפן הזה לא תומך בהקראה כלל.');
+      return;
+    }
+
     tts.prime();
     tts.speak('בדיקת קול. אני שומע אותך.');
 
@@ -272,7 +294,9 @@ export default function AssistantPanel() {
 
       <div className="assistant__meta">
         <span>
-          {ready ? 'מחובר ל-Google · קריאה ויצירת אירועים' : 'לא מחובר'}
+          {ready ? 'מחובר ל-Google' : 'לא מחובר'}
+          {' · '}
+          <span className="ltr-numerals">{__BUILD_ID__}</span>
         </span>
         <span>
           {tts.isSupported ? (
@@ -280,11 +304,14 @@ export default function AssistantPanel() {
               {speakReplies ? '🔊 קול פעיל' : '🔇 קול כבוי'}
             </button>
           ) : null}
-          {tts.isSupported ? (
-            <button type="button" onClick={testSound}>
-              בדוק קול
-            </button>
-          ) : null}
+          {/* Always shown. Hiding the diagnostic when speech is unavailable removes
+              the one control that could explain the silence. */}
+          <button type="button" onClick={testSound}>
+            בדוק קול
+          </button>
+          <button type="button" onClick={forceUpdate}>
+            עדכן גרסה
+          </button>
           {assistant.messages.length > 0 ? (
             <button type="button" onClick={assistant.clear}>
               נקה
