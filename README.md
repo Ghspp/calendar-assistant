@@ -17,8 +17,10 @@ API, and Google Calendar's free quota.
 | 6 | Multi-turn conversation for missing or ambiguous details | Done |
 | 7 | Calendar questions and free-slot search (read-only) | Done |
 | 8 | Editing and deleting, with match disambiguation | Done |
+| 9 | Visual calendar with manual add and delete | Done |
 | 10 | Installable PWA, offline shell, deployment | Done |
-| 9 | Visual calendar (day/week grid) | Not started |
+
+All ten stages are complete.
 
 **The app can now create events in your real calendar.** It still cannot edit or delete them —
 those arrive in Stage 8, together with the disambiguation rules that stop an ambiguous match being
@@ -284,6 +286,20 @@ Two rules that the code enforces rather than merely documents:
 All times are handled in `Asia/Jerusalem`. Wall-clock times are converted to absolute instants
 exactly once, and every comparison after that is on instants — which is why the logic stays correct
 across the DST change.
+
+### The visual calendar
+
+A second tab shows the calendar itself, so the app is usable without speaking: a day view
+with an hour grid, and a week view as an agenda grouped by day. Tapping an empty hour opens a
+form; tapping an event opens a sheet with a delete action.
+
+The week view is an agenda rather than seven columns on purpose — a seven-column grid is
+unreadable at phone width, and this app is phone-first.
+
+**Manual actions are not a second code path.** A tapped create is assembled into an ordinary
+command and run through the same `executeCommand` as a spoken one, so validation and conflict
+detection apply identically. A tapped delete still asks for confirmation. The visual route gets
+no weaker a guard than the spoken one.
 
 ### Editing and deleting
 

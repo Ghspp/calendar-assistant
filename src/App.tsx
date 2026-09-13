@@ -2,6 +2,7 @@ import { useState } from 'react';
 import './App.css';
 import { useTheme } from './hooks/useTheme';
 import AssistantPanel from './screens/AssistantPanel';
+import CalendarScreen from './screens/CalendarScreen';
 import ParserDevPanel from './screens/ParserDevPanel';
 import CalendarDebugPanel from './screens/CalendarDebugPanel';
 import type { ThemePreference } from './storage/prefs';
@@ -24,6 +25,7 @@ const THEME_OPTIONS: Array<{ value: ThemePreference; label: string }> = [
  */
 export default function App() {
   const { theme, setTheme } = useTheme();
+  const [tab, setTab] = useState<'assistant' | 'calendar'>('assistant');
   const [showDevPanel, setShowDevPanel] = useState(false);
   const [showCalendarPanel, setShowCalendarPanel] = useState(false);
 
@@ -45,7 +47,23 @@ export default function App() {
         </div>
       </header>
 
-      <AssistantPanel />
+      <nav className="tabs" role="group" aria-label="מסכים">
+        <button type="button" aria-pressed={tab === 'assistant'} onClick={() => setTab('assistant')}>
+          🎙️ עוזר
+        </button>
+        <button type="button" aria-pressed={tab === 'calendar'} onClick={() => setTab('calendar')}>
+          📅 יומן
+        </button>
+      </nav>
+
+      {/* Both screens stay mounted so switching tabs does not discard a half-finished
+          conversation or reload the calendar on every glance. */}
+      <div hidden={tab !== 'assistant'}>
+        <AssistantPanel />
+      </div>
+      <div hidden={tab !== 'calendar'}>
+        <CalendarScreen />
+      </div>
 
       <section className="panel">
         <h2>מצב הפרויקט</h2>
@@ -87,7 +105,7 @@ export default function App() {
             <span>שלב 8 — שינוי וביטול אירועים</span>
           </li>
           <li>
-            <span className="mark mark--pending">○</span>
+            <span className="mark">✓</span>
             <span>שלב 9 — תצוגת יומן ויזואלית</span>
           </li>
           <li>
