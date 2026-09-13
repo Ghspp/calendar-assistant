@@ -39,6 +39,7 @@ export default function AssistantPanel() {
   const assistant = useAssistant();
   const [draft, setDraft] = useState('');
   const [speakReplies, setSpeakReplies] = useState(() => loadPrefs().speakReplies);
+  const [soundReport, setSoundReport] = useState<string | undefined>();
 
   const tts = useMemo(() => createTtsService(), []);
   const online = useOnlineStatus();
@@ -57,7 +58,9 @@ export default function AssistantPanel() {
     if (latest.id <= lastSpokenId.current) return;
 
     lastSpokenId.current = latest.id;
-    tts.speak(latest.text);
+    // Android holds the audio session briefly after speech recognition finishes, and
+    // an utterance started inside that window is dropped without an error.
+    tts.speak(latest.text, { delayMs: 350 });
   }, [assistant.messages, speakReplies, tts]);
 
   const handleTranscript = useCallback(
@@ -114,6 +117,28 @@ export default function AssistantPanel() {
     const text = draft;
     setDraft('');
     void assistant.send(text);
+  }
+
+  function testSound() {
+    // Spoken straight from the tap, so this is the best case the browser allows. If
+    // this is silent too, the problem is the device rather than the app.
+    tts.prime();
+    tts.speak('בדיקת קול. אני שומע אותך.');
+
+    globalThis.setTimeout(() => {
+      const status = tts.getStatus();
+      setSoundReport(
+        status.voiceCount === 0
+          ? 'המכשיר לא מדווח על אף קול מותקן.'
+          : !status.hasLanguageVoice
+            ? `יש ${status.voiceCount} קולות, אבל אין קול עברי מותקן.`
+            : status.state === 'error'
+              ? `שגיאה: ${status.detail ?? 'לא ידוע'}`
+              : status.state === 'spoke' || status.state === 'speaking'
+                ? 'הקול נשלח בהצלחה. אם לא שמעת — בדוק את עוצמת המדיה.'
+                : `מצב: ${status.state}`,
+      );
+    }, 1200);
   }
 
   function toggleSpeech() {
@@ -239,6 +264,12 @@ export default function AssistantPanel() {
         </div>
       ) : null}
 
+      {soundReport !== undefined ? (
+        <p className="assistant__offline" role="status">
+          {soundReport}
+        </p>
+      ) : null}
+
       <div className="assistant__meta">
         <span>
           {ready ? 'מחובר ל-Google · קריאה ויצירת אירועים' : 'לא מחובר'}
@@ -247,6 +278,11 @@ export default function AssistantPanel() {
           {tts.isSupported ? (
             <button type="button" onClick={toggleSpeech} aria-pressed={speakReplies}>
               {speakReplies ? '🔊 קול פעיל' : '🔇 קול כבוי'}
+            </button>
+          ) : null}
+          {tts.isSupported ? (
+            <button type="button" onClick={testSound}>
+              בדוק קול
             </button>
           ) : null}
           {assistant.messages.length > 0 ? (

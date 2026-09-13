@@ -8,7 +8,7 @@ class FakeUtterance {
   pitch = 1;
   volume = 1;
   onend: (() => void) | null = null;
-  onerror: (() => void) | null = null;
+  onerror: ((event?: { error?: string }) => void) | null = null;
   constructor(public text: string) {}
 }
 
@@ -18,15 +18,20 @@ function fakeSynth(voices: Array<{ lang: string; name: string }> = []) {
     speak: (utterance) => spoken.push(utterance as unknown as FakeUtterance),
     cancel: vi.fn(),
     getVoices: () => voices,
+    speaking: false,
   };
   return { synth, spoken };
 }
+
+/** Runs scheduled work immediately, so the tests need no timers. */
+const immediate = (run: () => void) => run();
 
 function makeService(voices: Array<{ lang: string; name: string }> = []) {
   const { synth, spoken } = fakeSynth(voices);
   const tts = createTtsService({
     synth,
     utteranceCtor: FakeUtterance as unknown as new (text: string) => FakeUtterance,
+    schedule: immediate,
   });
   return { tts, synth, spoken };
 }
@@ -69,11 +74,22 @@ describe('speaking', () => {
     expect(spoken[0]?.lang).toBe('en-US');
   });
 
-  it('cancels anything already speaking, so answers do not overlap', () => {
+  it('does NOT cancel when nothing is speaking', () => {
+    // Cancelling immediately before speaking discards the new utterance on Android.
     const { tts, synth } = makeService();
     tts.speak('ראשון');
     tts.speak('שני');
-    expect(synth.cancel).toHaveBeenCalledTimes(2);
+    expect(synth.cancel).not.toHaveBeenCalled();
+  });
+
+  it('cancels only when an utterance really is in progress', () => {
+    const { tts, synth, spoken } = makeService();
+    synth.speaking = true;
+    tts.speak('שני');
+
+    expect(synth.cancel).toHaveBeenCalledOnce();
+    // And the replacement still gets spoken, after the queue settles.
+    expect(spoken.map((u) => u.text)).toEqual(['שני']);
   });
 
   it('ignores empty or whitespace-only text', () => {
@@ -123,6 +139,7 @@ describe('voice selection', () => {
     const tts = createTtsService({
       synth,
       utteranceCtor: FakeUtterance as unknown as new (text: string) => FakeUtterance,
+      schedule: immediate,
     });
     expect(() => tts.speak('שלום')).not.toThrow();
     expect(synth.speak).toHaveBeenCalledOnce();
@@ -141,6 +158,7 @@ describe('resilience', () => {
     const tts = createTtsService({
       synth,
       utteranceCtor: FakeUtterance as unknown as new (text: string) => FakeUtterance,
+      schedule: immediate,
     });
     expect(() => tts.speak('שלום')).not.toThrow();
   });
@@ -156,6 +174,7 @@ describe('resilience', () => {
     const tts = createTtsService({
       synth,
       utteranceCtor: FakeUtterance as unknown as new (text: string) => FakeUtterance,
+      schedule: immediate,
     });
     expect(() => tts.cancel()).not.toThrow();
   });
@@ -213,6 +232,7 @@ describe('voices that load late', () => {
     const tts = createTtsService({
       synth,
       utteranceCtor: FakeUtterance as unknown as new (text: string) => FakeUtterance,
+      schedule: immediate,
     });
 
     voices.push({ lang: 'he-IL', name: 'Hebrew' });
@@ -220,5 +240,43 @@ describe('voices that load late', () => {
 
     tts.speak('שלום');
     expect(spoken[0]?.voice?.name).toBe('Hebrew');
+  });
+});
+
+describe('status, so silence can be explained', () => {
+  it('reports how many voices the engine has', () => {
+    const { tts } = makeService([{ lang: 'he-IL', name: 'Hebrew' }]);
+    tts.speak('שלום');
+
+    const status = tts.getStatus();
+    expect(status.voiceCount).toBe(1);
+    expect(status.hasLanguageVoice).toBe(true);
+  });
+
+  it('reports when no Hebrew voice is installed', () => {
+    const { tts } = makeService([{ lang: 'en-US', name: 'English' }]);
+    tts.speak('שלום');
+    expect(tts.getStatus().hasLanguageVoice).toBe(false);
+  });
+
+  it('records an error reported by the engine', () => {
+    const { tts, spoken } = makeService();
+    tts.speak('שלום');
+    spoken[0]?.onerror?.({ error: 'synthesis-failed' });
+
+    expect(tts.getStatus().state).toBe('error');
+    expect(tts.getStatus().detail).toBe('synthesis-failed');
+  });
+
+  it('records success when the utterance finishes', () => {
+    const { tts, spoken } = makeService();
+    tts.speak('שלום');
+    spoken[0]?.onend?.();
+    expect(tts.getStatus().state).toBe('spoke');
+  });
+
+  it('reports unsupported when there is no engine', () => {
+    const tts = createTtsService({ synth: undefined, utteranceCtor: undefined });
+    expect(tts.getStatus().state).toBe('unsupported');
   });
 });
