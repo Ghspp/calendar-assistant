@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="היומן שלי">
+  <rect width="512" height="512" rx="112" fill="#3b5bdb"/>
+  <rect x="104" y="132" width="304" height="268" rx="32" fill="#ffffff"/>
+  <rect x="104" y="132" width="304" height="64" rx="32" fill="#e8edfb"/>
+  <rect x="104" y="164" width="304" height="32" fill="#e8edfb"/>
+  <circle cx="168" cy="120" r="20" fill="#3b5bdb"/>
+  <circle cx="344" cy="120" r="20" fill="#3b5bdb"/>
+  <rect x="158" y="96" width="20" height="48" rx="10" fill="#2f49b0"/>
+  <rect x="334" y="96" width="20" height="48" rx="10" fill="#2f49b0"/>
+  <!-- Microphone: the app is voice first. -->
+  <rect x="232" y="228" width="48" height="88" rx="24" fill="#3b5bdb"/>
+  <path d="M204 296a52 52 0 0 0 104 0" fill="none" stroke="#3b5bdb" stroke-width="18" stroke-linecap="round"/>
+  <rect x="247" y="344" width="18" height="30" rx="9" fill="#3b5bdb"/>
+</svg>

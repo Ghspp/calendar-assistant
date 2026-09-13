@@ -1,0 +1,204 @@
+.assistant {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.assistant__prompt {
+  text-align: center;
+  font-size: var(--text-lg);
+  color: var(--color-text-muted);
+}
+
+.assistant__connect {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.assistant__connect-text {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  max-width: 34ch;
+}
+
+.assistant__button {
+  min-height: var(--touch-min);
+  padding: var(--space-2) var(--space-5);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: var(--color-text-inverted);
+  font-weight: 600;
+  transition: background var(--duration-fast) var(--ease), opacity var(--duration-fast) var(--ease);
+}
+
+.assistant__button:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.assistant__button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.assistant__composer {
+  display: flex;
+  gap: var(--space-2);
+  align-items: stretch;
+}
+
+.assistant__input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--touch-min);
+  padding: var(--space-3);
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--duration-fast) var(--ease);
+}
+
+.assistant__input:focus {
+  border-color: var(--color-accent);
+}
+
+.assistant__log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.assistant__bubble {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  max-width: 92%;
+}
+
+.assistant__bubble--user {
+  align-self: flex-start;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.assistant__bubble--assistant {
+  align-self: flex-end;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.assistant__bubble--created {
+  background: var(--color-success-soft);
+  border-color: transparent;
+  color: var(--color-success);
+}
+
+.assistant__bubble--conflict {
+  background: var(--color-danger-soft);
+  border-color: transparent;
+  color: var(--color-danger);
+}
+
+.assistant__bubble--question {
+  background: var(--color-warning-soft);
+  border-color: transparent;
+  color: var(--color-text);
+}
+
+.assistant__link {
+  display: inline-block;
+  margin-block-start: var(--space-2);
+  font-size: var(--text-sm);
+  color: inherit;
+}
+
+.assistant__examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: center;
+}
+
+.assistant__example {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.assistant__example:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.assistant__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.assistant__meta button {
+  background: none;
+  border: 0;
+  color: inherit;
+  text-decoration: underline;
+  font-size: inherit;
+  padding: var(--space-1);
+}
+
+.assistant__meta span:last-child {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.assistant__meta button[aria-pressed='false'] {
+  opacity: 0.6;
+}
+
+.assistant__offline {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-warning-soft);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  text-align: center;
+}
+
+.assistant__install {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-accent-soft);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+}
+
+.assistant__install button:not(.assistant__button) {
+  background: none;
+  border: 0;
+  color: inherit;
+  text-decoration: underline;
+  font-size: inherit;
+  margin-inline-start: var(--space-3);
+  padding: var(--space-1);
+}

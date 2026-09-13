@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="היומן שלי">
+  <!-- Maskable: artwork stays inside the safe zone so Android can crop it to any shape. -->
+  <rect width="512" height="512" fill="#3b5bdb"/>
+  <rect x="146" y="170" width="220" height="196" rx="24" fill="#ffffff"/>
+  <rect x="146" y="170" width="220" height="46" rx="24" fill="#e8edfb"/>
+  <rect x="146" y="193" width="220" height="23" fill="#e8edfb"/>
+  <rect x="240" y="238" width="32" height="60" rx="16" fill="#3b5bdb"/>
+  <path d="M221 286a35 35 0 0 0 70 0" fill="none" stroke="#3b5bdb" stroke-width="13" stroke-linecap="round"/>
+  <rect x="250" y="318" width="12" height="22" rx="6" fill="#3b5bdb"/>
+</svg>

@@ -1,0 +1,127 @@
+/*
+ * Design tokens. Light palette is defined on bare :root so it is always present.
+ * Dark is redefined twice: once for the system preference (guarded so an explicit
+ * light choice wins) and once for an explicit data-theme="dark" choice.
+ * Never define a colour only inside a media query.
+ */
+
+:root {
+  /* Surfaces */
+  --color-bg: #f7f7f9;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-border: #e4e4e9;
+
+  /* Text */
+  --color-text: #16161a;
+  --color-text-muted: #6b6b76;
+  --color-text-inverted: #ffffff;
+
+  /* Brand / accent */
+  --color-accent: #3b5bdb;
+  --color-accent-hover: #364fc7;
+  --color-accent-soft: #e8edfb;
+
+  /* Semantic — used by conflict notices and availability answers */
+  --color-success: #2b8a3e;
+  --color-success-soft: #e6f4ea;
+  --color-danger: #c92a2a;
+  --color-danger-soft: #fdecec;
+  --color-warning: #e8590c;
+  --color-warning-soft: #fdf0e6;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(16, 16, 24, 0.06);
+  --shadow-md: 0 4px 16px rgba(16, 16, 24, 0.1);
+
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-full: 999px;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* Type */
+  --font-sans: 'Heebo', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+
+  /* Touch targets — mobile-first, never below 44px */
+  --touch-min: 44px;
+  --mic-size: 132px;
+
+  /* Motion. Subtle by default; fully disabled under reduced-motion below. */
+  --ease: cubic-bezier(0.2, 0, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-base: 220ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-bg: #121216;
+    --color-surface: #1c1c22;
+    --color-surface-raised: #24242c;
+    --color-border: #33333d;
+
+    --color-text: #f2f2f5;
+    --color-text-muted: #9a9aa6;
+    --color-text-inverted: #16161a;
+
+    --color-accent: #748ffc;
+    --color-accent-hover: #91a7ff;
+    --color-accent-soft: #232842;
+
+    --color-success: #69db7c;
+    --color-success-soft: #1b2a1f;
+    --color-danger: #ff8787;
+    --color-danger-soft: #2e1c1e;
+    --color-warning: #ffa94d;
+    --color-warning-soft: #2e2319;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-bg: #121216;
+  --color-surface: #1c1c22;
+  --color-surface-raised: #24242c;
+  --color-border: #33333d;
+
+  --color-text: #f2f2f5;
+  --color-text-muted: #9a9aa6;
+  --color-text-inverted: #16161a;
+
+  --color-accent: #748ffc;
+  --color-accent-hover: #91a7ff;
+  --color-accent-soft: #232842;
+
+  --color-success: #69db7c;
+  --color-success-soft: #1b2a1f;
+  --color-danger: #ff8787;
+  --color-danger-soft: #2e1c1e;
+  --color-warning: #ffa94d;
+  --color-warning-soft: #2e2319;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+  }
+}

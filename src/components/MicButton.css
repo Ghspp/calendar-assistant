@@ -1,0 +1,91 @@
+.mic {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding-block: var(--space-5);
+}
+
+.mic__button {
+  position: relative;
+  width: var(--mic-size);
+  height: var(--mic-size);
+  border-radius: var(--radius-full);
+  border: 0;
+  background: var(--color-accent);
+  color: var(--color-text-inverted);
+  display: grid;
+  place-items: center;
+  box-shadow: var(--shadow-md);
+  transition: transform var(--duration-base) var(--ease),
+    background var(--duration-fast) var(--ease), opacity var(--duration-fast) var(--ease);
+  /* Keep the tap from selecting text or firing the magnifier on mobile. */
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mic__icon {
+  position: relative;
+  z-index: 1;
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.mic__button:not(:disabled):active {
+  transform: scale(0.94);
+}
+
+.mic__button--disabled,
+.mic__button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.mic__button--listening {
+  background: var(--color-danger);
+}
+
+/* Expanding rings, visible only while listening. */
+.mic__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-danger);
+  opacity: 0;
+  z-index: 0;
+}
+
+.mic__button--listening .mic__ring {
+  animation: mic-pulse 1.8s var(--ease) infinite;
+}
+
+.mic__button--listening .mic__ring--delayed {
+  animation-delay: 0.9s;
+}
+
+@keyframes mic-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.45;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+/* A pulsing ring is decorative; never force it on someone who asked for stillness. */
+@media (prefers-reduced-motion: reduce) {
+  .mic__button--listening .mic__ring {
+    animation: none;
+    opacity: 0.25;
+  }
+}
+
+.mic__caption {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+  min-height: 1.5em;
+}
