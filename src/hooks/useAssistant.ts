@@ -9,6 +9,7 @@ import {
   type AuthState,
 } from '../services/calendar/auth';
 import { createGoogleCalendarProvider } from '../services/calendar/GoogleCalendarProvider';
+import { withChangeNotifications } from '../services/calendar/changes';
 import { handleTurn } from '../services/assistant/handleTurn';
 import { respond } from '../services/assistant/responder';
 import { systemClock } from '../utils/clock';
@@ -68,10 +69,12 @@ export function useAssistant(): UseAssistantResult {
 
   const provider = useMemo(
     () =>
-      createGoogleCalendarProvider({
-        getAccessToken: requestAccessToken,
-        onAuthExpired: signOut,
-      }),
+      withChangeNotifications(
+        createGoogleCalendarProvider({
+          getAccessToken: requestAccessToken,
+          onAuthExpired: signOut,
+        }),
+      ),
     [],
   );
 

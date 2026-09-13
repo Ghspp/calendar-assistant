@@ -7,6 +7,7 @@ import {
   type AuthState,
 } from '../services/calendar/auth';
 import { createGoogleCalendarProvider } from '../services/calendar/GoogleCalendarProvider';
+import { onCalendarChanged, withChangeNotifications } from '../services/calendar/changes';
 import { executeCommand } from '../services/assistant/handleCommand';
 import { confirmDelete } from '../services/assistant/deletes';
 import { CalendarError } from '../services/calendar/errors';
@@ -56,10 +57,12 @@ export function useCalendarEvents(
 
   const provider = useMemo(
     () =>
-      createGoogleCalendarProvider({
-        getAccessToken: requestAccessToken,
-        onAuthExpired: signOut,
-      }),
+      withChangeNotifications(
+        createGoogleCalendarProvider({
+          getAccessToken: requestAccessToken,
+          onAuthExpired: signOut,
+        }),
+      ),
     [],
   );
 
@@ -97,6 +100,25 @@ export function useCalendarEvents(
   useEffect(() => {
     void reload();
   }, [reload, authState]);
+
+  // Any write, from any screen, refreshes what is on show. This is what stops an event
+  // created by voice from being invisible on the calendar tab.
+  useEffect(
+    () =>
+      onCalendarChanged(() => {
+        void reload();
+      }),
+    [reload],
+  );
+
+  // Coming back from the Google Calendar app should not show a stale day either.
+  useEffect(() => {
+    const refreshIfVisible = (): void => {
+      if (document.visibilityState === 'visible') void reload();
+    };
+    document.addEventListener('visibilitychange', refreshIfVisible);
+    return () => document.removeEventListener('visibilitychange', refreshIfVisible);
+  }, [reload]);
 
   const connect = useCallback(async () => {
     try {
