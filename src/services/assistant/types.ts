@@ -41,7 +41,18 @@ export type CommandOutcome =
       informational: AllDayCalendarEvent[];
     }
   /** The slot was taken. NOTHING was written. */
-  | { kind: 'conflict'; event: StructuredEvent; conflicts: Conflict[] }
+  | {
+      kind: 'conflict';
+      event: StructuredEvent;
+      conflicts: Conflict[];
+      /**
+       * A gap that would have worked. Purely a suggestion — the assistant never moves
+       * an event on its own, so nothing happens until the user accepts it.
+       */
+      suggestion?: FreeSlot;
+    }
+  /** 'בזמן הפנוי הראשון' found no opening long enough. Nothing was written. */
+  | { kind: 'no-free-slot'; date: string; timeZone: string }
   /** Something is missing or ambiguous; the user has to answer first. */
   | { kind: 'needs-input'; parsed: ParsedCommand; errors: ValidationError[] }
   /** What is on the calendar for a day or a week. Read-only. */

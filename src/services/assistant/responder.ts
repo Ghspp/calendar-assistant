@@ -296,18 +296,27 @@ export function respond(outcome: CommandOutcome, clock: Clock): string {
       const timeZone = event.timeZone;
       const requested = `${event.startTime}${MAQAF}${event.endTime}`;
 
-      if (conflicts.length === 1 && conflicts[0] !== undefined) {
-        return (
-          `לא ניתן לקבוע את ${event.title} ב${MAQAF}${requested} ` +
-          `כי יש לך ${describeConflict(conflicts[0], timeZone)}.`
-        );
-      }
+      const refusal =
+        conflicts.length === 1 && conflicts[0] !== undefined
+          ? `לא ניתן לקבוע את ${event.title} ב${MAQAF}${requested} ` +
+            `כי יש לך ${describeConflict(conflicts[0], timeZone)}.`
+          : `לא ניתן לקבוע את ${event.title} ב${MAQAF}${requested} כי יש לך ` +
+            conflicts
+              .map((conflict) => `${conflict.event.title} ${conflictRange(conflict, timeZone)}`)
+              .join(', ') +
+            '.';
 
-      const list = conflicts
-        .map((conflict) => `${conflict.event.title} ${conflictRange(conflict, timeZone)}`)
-        .join(', ');
-      return `לא ניתן לקבוע את ${event.title} ב${MAQAF}${requested} כי יש לך ${list}.`;
+      // An offer, never an action. Nothing moves unless the user says yes.
+      if (outcome.suggestion === undefined) return refusal;
+
+      return (
+        `${refusal} אתה פנוי ב${MAQAF}${outcome.suggestion.startTime}. ` +
+        `רוצה שאקבע שם?`
+      );
     }
+
+    case 'no-free-slot':
+      return `לא מצאתי שעה פנויה ${describeDate(outcome.date, clock)}.`;
 
     case 'needs-input': {
       // One question at a time. Asking three things at once gets none of them answered.

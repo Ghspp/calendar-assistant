@@ -48,6 +48,13 @@ export interface ParsedCommand {
   /** HH:mm. Derived from an explicit 'עד' or from start + duration. */
   endTime?: string;
   durationMinutes?: number;
+  /**
+   * The user asked for the earliest opening rather than naming an hour.
+   *
+   * The start time is then chosen from the calendar instead of from the utterance —
+   * which is not a guess about what they meant, but a computation they asked for.
+   */
+  useFirstFreeSlot?: boolean;
   /** Slots with no information at all. Drives 'באיזו שעה לקבוע?' style questions. */
   missing: SlotName[];
   /** Slots that had information the parser refused to resolve. */

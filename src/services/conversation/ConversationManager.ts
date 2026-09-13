@@ -12,7 +12,11 @@
 
 import type { Clock } from '../../utils/clock';
 import type { ParsedCommand, SlotName } from '../../types/parser';
-import type { CalendarEvent, TimedCalendarEvent } from '../../types/calendar';
+import type {
+  CalendarEvent,
+  StructuredEvent,
+  TimedCalendarEvent,
+} from '../../types/calendar';
 import type { UpdateChange } from '../assistant/updateParsing';
 import { parseCommand } from '../parser';
 import {
@@ -59,7 +63,17 @@ export type PendingAction =
       context: CalendarEvent[];
       updatedAtMs: number;
     }
-  | { kind: 'confirm-delete'; event: TimedCalendarEvent; updatedAtMs: number };
+  | { kind: 'confirm-delete'; event: TimedCalendarEvent; updatedAtMs: number }
+  /**
+   * An alternative slot was offered after a conflict. NOTHING has been written; the
+   * offer becomes an action only on an explicit yes.
+   */
+  | {
+      kind: 'confirm-suggestion';
+      event: StructuredEvent;
+      startTime: string;
+      updatedAtMs: number;
+    };
 
 export interface ConversationState {
   pending?: PendingRequest;

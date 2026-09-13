@@ -21,12 +21,15 @@ import type { CalendarProvider, CreateEventOptions } from '../calendar/CalendarP
 import { CalendarError } from '../calendar/errors';
 import { GoogleAuthError } from '../calendar/auth';
 import { detectConflicts } from '../conflict/detectConflicts';
+import { findFreeSlots } from '../conflict/findFreeSlots';
 import { parseCommand } from '../parser';
 import { validateEvent } from '../validation/validateEvent';
 import { answerFindFree, answerQuery } from './queries';
 import { applyUpdate } from './updates';
 import { startDelete } from './deletes';
 import type { ParsedCommand } from '../../types/parser';
+import type { CalendarEvent } from '../../types/calendar';
+import type { FreeSlot } from '../conflict/findFreeSlots';
 import type { CommandOutcome } from './types';
 
 export interface HandleCommandOptions {
@@ -96,24 +99,40 @@ export async function executeCommand(
     return { kind: 'unsupported', parsed };
   }
 
-  // The safety gate. An ambiguous hour or a missing slot stops here, before any
-  // network call — there is nothing to look up until we know what was asked for.
-  const validation = validateEvent(parsed, clock);
-  if (!validation.ok) {
-    return { kind: 'needs-input', parsed, errors: validation.errors };
-  }
-
-  const event = validation.event;
-
   try {
+    // 'בזמן הפנוי הראשון' — the hour comes from the calendar rather than the
+    // utterance. Resolved before validation, which insists on a concrete start.
+    const command = parsed.useFirstFreeSlot
+      ? await resolveFirstFreeSlot(parsed, options)
+      : parsed;
+
+    if (command === undefined) {
+      return { kind: 'no-free-slot', date: parsed.date ?? '', timeZone };
+    }
+
+    // The safety gate. An ambiguous hour or a missing slot stops here.
+    const validation = validateEvent(command, clock);
+    if (!validation.ok) {
+      return { kind: 'needs-input', parsed: command, errors: validation.errors };
+    }
+
+    const event = validation.event;
+
     // Fetch fresh. An event created on the phone a minute ago must be seen.
     const existing = await provider.listEventsForDate(event.date);
     const report = detectConflicts(event.interval, existing, timeZone);
 
     if (report.hasConflict) {
-      // Explicitly do NOT write, and do not offer to move it — the spec is clear that
-      // the assistant never relocates an event unless asked.
-      return { kind: 'conflict', event, conflicts: report.conflicts };
+      // NOTHING is written, and the event is never relocated on its own. Offering an
+      // alternative is not the same as taking one: the suggestion is inert until the
+      // user says yes.
+      const suggestion = suggestAlternative(event, existing, options);
+      return {
+        kind: 'conflict',
+        event,
+        conflicts: report.conflicts,
+        ...(suggestion !== undefined ? { suggestion } : {}),
+      };
     }
 
     const created = await provider.createEvent(event, options.create);
@@ -122,6 +141,49 @@ export async function executeCommand(
   } catch (error) {
     return toFailure(error);
   }
+}
+
+/**
+ * Fill in the start time from the earliest gap that fits.
+ *
+ * Returns undefined when the day has no opening long enough, which the caller reports
+ * rather than booking something that does not fit.
+ */
+async function resolveFirstFreeSlot(
+  parsed: ParsedCommand,
+  options: HandleCommandOptions,
+): Promise<ParsedCommand | undefined> {
+  const { provider, clock } = options;
+
+  const date = parsed.date;
+  const durationMinutes = parsed.durationMinutes;
+  if (date === undefined || durationMinutes === undefined) return parsed;
+
+  const events = await provider.listEventsForDate(date);
+  const slot = findFreeSlots({ date, events, durationMinutes }, clock)[0];
+  if (slot === undefined) return undefined;
+
+  return { ...parsed, startTime: slot.startTime, ambiguities: [], missing: [] };
+}
+
+/**
+ * The earliest gap that would have worked instead.
+ *
+ * Prefers a slot after the time that was asked for, since someone who wanted 17:30
+ * is more likely to accept 19:00 than 09:00. Falls back to the first of the day.
+ */
+function suggestAlternative(
+  event: { date: string; durationMinutes: number; startTime: string },
+  events: readonly CalendarEvent[],
+  options: HandleCommandOptions,
+): FreeSlot | undefined {
+  const slots = findFreeSlots(
+    { date: event.date, events, durationMinutes: event.durationMinutes },
+    options.clock,
+  );
+
+  const after = slots.find((slot) => slot.startTime >= event.startTime);
+  return after ?? slots[0];
 }
 
 function toFailure(error: unknown): CommandOutcome {

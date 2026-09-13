@@ -117,7 +117,7 @@ describe('refusing on a conflict', () => {
 
   it('names the conflicting event in Hebrew', async () => {
     const { outcome } = await run('תקבע לי פגישה מחר בחמש וחצי אחר הצהריים לשעה', football);
-    expect(respond(outcome, CLOCK)).toBe(
+    expect(respond(outcome, CLOCK)).toContain(
       'לא ניתן לקבוע את פגישה ב־17:30־18:30 כי יש לך חוג כדורגל בין 17:00 ל־18:00.',
     );
   });
@@ -144,11 +144,27 @@ describe('refusing on a conflict', () => {
     expect(respond(outcome, CLOCK)).toContain('שיעור נהיגה');
   });
 
-  it('never offers to move the event somewhere else', async () => {
-    const { outcome } = await run('תקבע לי פגישה מחר בחמש וחצי אחר הצהריים לשעה', football);
-    const message = respond(outcome, CLOCK);
-    expect(message).not.toContain('רוצה');
-    expect(message).not.toContain('במקום');
+  it('OFFERS an alternative but does not take it', async () => {
+    // The specification allows suggesting a free slot; what it forbids is relocating
+    // the event without being asked. The offer must therefore be inert.
+    const { outcome, createEvent } = await run(
+      'תקבע לי פגישה מחר בחמש וחצי אחר הצהריים לשעה',
+      football,
+    );
+
+    expect(outcome.kind).toBe('conflict');
+    expect(createEvent).not.toHaveBeenCalled();
+    expect(respond(outcome, CLOCK)).toContain('רוצה שאקבע שם?');
+  });
+
+  it('suggests a slot that is actually free and after the requested time', async () => {
+    const { outcome } = await run(
+      'תקבע לי פגישה מחר בחמש וחצי אחר הצהריים לשעה',
+      football,
+    );
+    expect(outcome.kind).toBe('conflict');
+    if (outcome.kind !== 'conflict') return;
+    expect(outcome.suggestion?.startTime).toBe('18:00');
   });
 
   it('ignores a cancelled event and creates normally', async () => {

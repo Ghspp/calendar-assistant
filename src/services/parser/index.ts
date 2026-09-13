@@ -13,7 +13,8 @@ import { detectIntent } from './intent';
 import { findDate } from './dateParser';
 import { findDuration } from './durationParser';
 import { findTimes, questionFor, type TimeExpression } from './timeParser';
-import { normalizeText, tokenize } from './normalize';
+import { matchPhrase, normalizeText, tokenize } from './normalize';
+import { FIRST_FREE_PHRASES } from './lexicon';
 import { extractTitle } from './titleExtractor';
 import type { Clock } from '../../utils/clock';
 import type { Ambiguity, Intent, ParsedCommand, SlotName } from '../../types/parser';
@@ -152,6 +153,10 @@ export function parseCommand(rawText: string, clock: Clock): ParsedCommand {
   const dateMatch = findDate(tokens, consumed, clock);
   dateMatch?.tokens.forEach((index) => consumed.add(index));
 
+  // Before the time parser: 'בשעה הפנויה הראשונה' starts with an hour marker, and
+  // leaving it for findTimes would have it read as the beginning of a clock time.
+  const useFirstFreeSlot = consumeFirstFreePhrase(tokens, consumed);
+
   // Times before durations: the time parser claims the 'לשעה' of 'תעביר לשעה 8' so the
   // duration parser cannot mistake it for a one-hour duration.
   const timeExpressions = findTimes(tokens, consumed);
@@ -222,7 +227,8 @@ export function parseCommand(rawText: string, clock: Clock): ParsedCommand {
     title,
     date: dateMatch?.date,
     dateRange: dateMatch?.range,
-    hasTimeExpression: startExpression !== undefined || dateMatch?.startTime !== undefined,
+    hasTimeExpression:
+      startExpression !== undefined || dateMatch?.startTime !== undefined || useFirstFreeSlot,
     startTime,
     endTime,
     durationMinutes,
@@ -246,10 +252,30 @@ export function parseCommand(rawText: string, clock: Clock): ParsedCommand {
     ...(startTime !== undefined ? { startTime } : {}),
     ...(endTime !== undefined ? { endTime } : {}),
     ...(durationMinutes !== undefined ? { durationMinutes } : {}),
+    ...(useFirstFreeSlot ? { useFirstFreeSlot: true } : {}),
     missing,
     ambiguities,
     confidence,
     rawText,
     normalizedText,
   };
+}
+
+/** Find and consume 'בזמן הפנוי הראשון' and its variants. */
+function consumeFirstFreePhrase(
+  tokens: ReturnType<typeof tokenize>,
+  consumed: Set<number>,
+): boolean {
+  for (let index = 0; index < tokens.length; index += 1) {
+    if (consumed.has(index)) continue;
+
+    for (const phrase of FIRST_FREE_PHRASES) {
+      const end = matchPhrase(tokens, index, phrase);
+      if (end === undefined) continue;
+
+      for (let i = index; i < end; i += 1) consumed.add(i);
+      return true;
+    }
+  }
+  return false;
 }

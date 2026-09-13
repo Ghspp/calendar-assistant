@@ -302,7 +302,7 @@ describe('conflicts still apply to a multi-turn request', () => {
       { events: [timed('חוג כדורגל', '17:00', '18:00')] },
     );
 
-    expect(replies[3]).toBe(
+    expect(replies[3]).toContain(
       'לא ניתן לקבוע את פגישה עם דניאל ב־17:00־18:00 כי יש לך חוג כדורגל בין 17:00 ל־18:00.',
     );
     expect(createEvent).not.toHaveBeenCalled();

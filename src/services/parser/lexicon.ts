@@ -262,6 +262,22 @@ export const HOUR_MARKER_STEM = 'שעה';
 /** Week-scope modifiers. */
 export const THIS_WEEK_TOKENS = new Set(['השבוע']);
 
+/**
+ * 'בזמן הפנוי הראשון' — let the assistant choose the earliest gap that fits.
+ *
+ * Matched before the time parser runs, so the 'בשעה' of 'בשעה הפנויה הראשונה' is
+ * consumed here rather than being read as the start of a clock time.
+ */
+export const FIRST_FREE_PHRASES: string[][] = [
+  ['בזמן', 'הפנוי', 'הראשון'],
+  ['בשעה', 'הפנויה', 'הראשונה'],
+  ['בחלון', 'הפנוי', 'הראשון'],
+  ['בזמן', 'הפנוי'],
+  ['בזמן', 'פנוי'],
+  ['מתי', 'שפנוי'],
+  ['מתי', 'שיהיה', 'פנוי'],
+];
+
 /** 'סוף השבוע' — Friday and Saturday in Israel. */
 export const WEEKEND_PHRASES: string[][] = [
   ['סוף', 'השבוע'],

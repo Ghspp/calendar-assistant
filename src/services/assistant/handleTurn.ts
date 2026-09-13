@@ -128,6 +128,15 @@ function pendingActionFor(
     return { kind: 'confirm-delete', event: outcome.event, updatedAtMs };
   }
 
+  if (outcome.kind === 'conflict' && outcome.suggestion !== undefined) {
+    return {
+      kind: 'confirm-suggestion',
+      event: outcome.event,
+      startTime: outcome.suggestion.startTime,
+      updatedAtMs,
+    };
+  }
+
   if (outcome.kind === 'delete-ambiguous') {
     return {
       kind: 'choose',
@@ -182,6 +191,45 @@ async function resolvePendingAction(
   // through drops the pending confirmation, which is the safe direction: the worst
   // case is the user has to ask to delete again.
   if (parseCommand(text, clock).intent !== 'UNKNOWN') return undefined;
+
+  if (action.kind === 'confirm-suggestion') {
+    const answer = readConfirmation(text);
+
+    if (answer === 'no') {
+      return {
+        outcome: { kind: 'abandoned', message: 'בסדר, לא קבעתי כלום.' },
+        state: clearPending(),
+      };
+    }
+
+    if (answer === 'yes') {
+      // Re-run the whole pipeline at the accepted hour, so the slot is checked again
+      // against fresh events rather than trusted from a moment ago.
+      const retry: ParsedCommand = {
+        intent: 'CREATE',
+        title: action.event.title,
+        date: action.event.date,
+        startTime: action.startTime,
+        durationMinutes: action.event.durationMinutes,
+        missing: [],
+        ambiguities: [],
+        confidence: 1,
+        rawText: text,
+        normalizedText: text,
+      };
+
+      const outcome = await executeCommand(retry, options);
+      return { outcome, state: clearPending() };
+    }
+
+    return {
+      outcome: {
+        kind: 'abandoned',
+        message: `לא הבנתי. לקבוע ב${'־'}${action.startTime}?`,
+      },
+      state: { action: { ...action, updatedAtMs: clock.now().getTime() } },
+    };
+  }
 
   if (action.kind === 'confirm-delete') {
     const answer = readConfirmation(text);

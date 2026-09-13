@@ -59,20 +59,29 @@ export default function AssistantPanel() {
 
     lastSpokenId.current = latest.id;
 
-    // Android refuses to read text in a language it has no voice for, and does so
-    // silently. Say why, once, instead of just being mysteriously quiet.
-    const status = tts.getStatus();
-    if (status.voiceCount > 0 && !status.hasLanguageVoice) {
-      setSoundReport(
-        'אין קול עברי מותקן במכשיר, ולכן אין הקראה. ' +
-          'הגדרות ← נגישות ← פלט טקסט לדיבור ← מנוע Google ← התקנת נתוני קול ← עברית.',
-      );
-      return;
-    }
-
-    // Android holds the audio session briefly after speech recognition finishes, and
-    // an utterance started inside that window is dropped without an error.
+    // ALWAYS attempt to speak, even when getVoices() reported no Hebrew.
+    //
+    // Chrome on Android is known to under-report installed voices. Leaving `voice`
+    // unset and naming the language lets the platform resolve it, which often finds a
+    // voice the list never mentioned. Refusing to try because of an unreliable list
+    // guarantees silence; trying and failing costs nothing.
+    //
+    // The delay covers a separate quirk: Android holds the audio session briefly after
+    // speech recognition ends, and an utterance started inside that window is dropped.
     tts.speak(latest.text, { delayMs: 350 });
+
+    // Report only an ACTUAL failure, observed after the fact.
+    globalThis.setTimeout(() => {
+      const status = tts.getStatus();
+      if (status.state === 'speaking' || status.state === 'spoke') return;
+
+      setSoundReport(
+        status.hasLanguageVoice
+          ? `ההקראה נכשלה (${status.detail ?? status.state}).`
+          : 'ההקראה לא הצליחה — ייתכן שאין קול עברי זמין לדפדפן. ' +
+            'לחץ "בדוק קול" לפרטים, או כבה את הקול ב-🔇.',
+      );
+    }, 1500);
   }, [assistant.messages, speakReplies, tts]);
 
   const handleTranscript = useCallback(
@@ -156,6 +165,7 @@ export default function AssistantPanel() {
       return;
     }
 
+    // Attempt regardless of what the voice list claims, then report what happened.
     tts.prime();
     tts.speak('בדיקת קול. אני שומע אותך.');
 
@@ -165,16 +175,19 @@ export default function AssistantPanel() {
       // an unexpected tag, and guessing from a yes/no answer wasted real time.
       const languages = status.languages.join(', ');
 
+      // What actually happened comes first; the voice list is only context for a
+      // failure. A successful utterance means it works, whatever the list said.
       setSoundReport(
-        status.voiceCount === 0
-          ? 'המכשיר לא מדווח על אף קול מותקן.'
-          : !status.hasLanguageVoice
-            ? `אין קול עברי. ${status.voiceCount} קולות זמינים: ${languages}`
-            : status.state === 'error'
-              ? `שגיאה: ${status.detail ?? 'לא ידוע'}`
-              : status.state === 'spoke' || status.state === 'speaking'
-                ? 'הקול נשלח בהצלחה. אם לא שמעת — בדוק את עוצמת המדיה.'
-                : `מצב: ${status.state} · קולות: ${languages}`,
+        status.state === 'spoke' || status.state === 'speaking'
+          ? status.hasLanguageVoice
+            ? 'הקול עובד. אם לא שמעת — בדוק את עוצמת המדיה.'
+            : 'הקול נשלח והמערכת קיבלה אותו, למרות שעברית לא מופיעה ברשימה. ' +
+              'אם שמעת — הכול בסדר.'
+          : status.state === 'error'
+            ? `שגיאה: ${status.detail ?? 'לא ידוע'} · קולות: ${languages}`
+            : status.voiceCount === 0
+              ? 'המכשיר לא מדווח על אף קול מותקן.'
+              : `לא הושמע כלום. ${status.voiceCount} קולות ברשימה: ${languages}`,
       );
     }, 1200);
   }

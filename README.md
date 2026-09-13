@@ -165,6 +165,8 @@ is written.
 | **נדרשת התחברות ל-Google Calendar** after a while | The access token expired (about an hour). Click connect again. |
 | **אין הרשאה לקרוא את היומן** when creating | The grant is still the old read-only scope. Disconnect and connect again to consent to `calendar.events`. |
 | Nothing happens when connecting | A popup blocker, or a content blocker preventing `accounts.google.com/gsi/client` from loading. |
+| **No spoken reply on a phone** | Mobile browsers refuse to speak unless the page has already spoken once from a direct tap. **Press בדוק קול once per session** and replies become audible. The app primes the engine automatically on the microphone button, but a silent priming utterance is not always enough — an audible one from a real tap always is. |
+| Spoken reply works on desktop but not mobile | Same cause as above. Desktop Chrome does not enforce the gesture requirement. |
 
 ---
 
@@ -333,6 +335,28 @@ round trip — and it still never guesses which one was meant. **Reads answer bo
 Day-part words narrow a free-slot search (`מחר בערב` searches 17:00–23:00), and free-slot
 results use exactly the same exclusion rules as conflict detection, so the two can never
 disagree about whether a slot is free.
+
+### Letting the assistant choose the hour
+
+```
+"תקבע לי פגישה מחר בזמן הפנוי הראשון לשעה"
+  →  "קבעתי פגישה מחר בין 08:00 ל־09:00."
+```
+
+The hour comes from the calendar rather than the utterance. That is not a guess about what
+was meant — it is a computation that was explicitly asked for.
+
+After a conflict the assistant offers an alternative, but never takes it:
+
+```
+"תקבע לי פגישה מחר ב-17:30 לשעה"
+  →  "לא ניתן לקבוע … כי יש לך חוג כדורגל בין 17:00 ל־18:00. אתה פנוי ב־18:00. רוצה שאקבע שם?"
+"כן"
+  →  "קבעתי פגישה מחר בין 18:00 ל־19:00."
+```
+
+The offer is inert until accepted, and accepting re-runs the whole pipeline — the slot is
+checked again against freshly fetched events rather than trusted from a moment earlier.
 
 ### Conversation
 
