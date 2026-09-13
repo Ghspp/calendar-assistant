@@ -63,6 +63,8 @@ export interface TtsStatus {
   voiceCount: number;
   /** True when a voice matching the requested language exists. */
   hasLanguageVoice: boolean;
+  /** Language tags the engine actually offers, for diagnosing a bad match. */
+  languages: string[];
   detail?: string;
 }
 
@@ -104,16 +106,32 @@ function findUtteranceCtor(): UtteranceConstructor | undefined {
   return typeof candidate === 'function' ? (candidate as UtteranceConstructor) : undefined;
 }
 
+/**
+ * Language codes that mean the same language.
+ *
+ * Hebrew's ISO code changed from 'iw' to 'he' decades ago, but plenty of Android TTS
+ * engines still report their Hebrew voice as 'iw-IL'. Looking only for 'he' therefore
+ * misses a Hebrew voice that is installed and working.
+ */
+const LANGUAGE_ALIASES: Record<string, readonly string[]> = {
+  he: ['he', 'iw'],
+  iw: ['he', 'iw'],
+};
+
+function baseOf(lang: string): string {
+  return (lang.split('-')[0] ?? lang).toLowerCase();
+}
+
 /** The best voice for a language, or undefined to let the platform choose. */
-function selectVoice(
+export function selectVoice(
   voices: readonly SpeechSynthesisVoiceLike[],
   lang: string,
 ): SpeechSynthesisVoiceLike | undefined {
   const exact = voices.find((voice) => voice.lang === lang);
   if (exact !== undefined) return exact;
 
-  const prefix = lang.split('-')[0] ?? lang;
-  return voices.find((voice) => voice.lang.startsWith(prefix));
+  const wanted = LANGUAGE_ALIASES[baseOf(lang)] ?? [baseOf(lang)];
+  return voices.find((voice) => wanted.includes(baseOf(voice.lang)));
 }
 
 export function createTtsService(options: TtsOptions = {}): TtsService {
@@ -131,6 +149,7 @@ export function createTtsService(options: TtsOptions = {}): TtsService {
     state: isSupported ? 'idle' : 'unsupported',
     voiceCount: 0,
     hasLanguageVoice: false,
+    languages: [],
   };
 
   // Voices arrive asynchronously on most platforms. Asking once at startup usually
@@ -144,16 +163,21 @@ export function createTtsService(options: TtsOptions = {}): TtsService {
     }
   };
   refreshVoices();
-  synth?.addEventListener?.('voiceschanged', refreshVoices);
 
   function setStatus(state: TtsState, detail?: string): void {
     status = {
       state,
       voiceCount: voices.length,
       hasLanguageVoice: selectVoice(voices, HEBREW_LANG) !== undefined,
+      languages: [...new Set(voices.map((voice) => voice.lang))].sort(),
       ...(detail !== undefined ? { detail } : {}),
     };
   }
+
+  synth?.addEventListener?.('voiceschanged', () => {
+    refreshVoices();
+    setStatus(status.state);
+  });
 
   function build(text: string, lang: string, volume: number): SpeechSynthesisUtteranceLike {
     if (utteranceCtor === undefined) throw new Error('no utterance constructor');

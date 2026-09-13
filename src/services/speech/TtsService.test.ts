@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createTtsService, type SpeechSynthesisLike } from './TtsService';
+import { createTtsService, selectVoice, type SpeechSynthesisLike } from './TtsService';
 
 class FakeUtterance {
   lang = '';
@@ -278,5 +278,41 @@ describe('status, so silence can be explained', () => {
   it('reports unsupported when there is no engine', () => {
     const tts = createTtsService({ synth: undefined, utteranceCtor: undefined });
     expect(tts.getStatus().state).toBe('unsupported');
+  });
+});
+
+describe('Hebrew language tags', () => {
+  // Hebrew's ISO code changed from 'iw' to 'he', and many Android engines still report
+  // the old one. Matching only 'he' hides a Hebrew voice that is installed and working.
+  it('matches a voice tagged iw-IL', () => {
+    const voices = [{ lang: 'iw-IL', name: 'Hebrew (legacy tag)' }];
+    expect(selectVoice(voices, 'he-IL')?.name).toBe('Hebrew (legacy tag)');
+  });
+
+  it('prefers an exact he-IL match over the legacy tag', () => {
+    const voices = [
+      { lang: 'iw-IL', name: 'legacy' },
+      { lang: 'he-IL', name: 'modern' },
+    ];
+    expect(selectVoice(voices, 'he-IL')?.name).toBe('modern');
+  });
+
+  it('reports a legacy-tagged voice as available', () => {
+    const { tts } = makeService([{ lang: 'iw-IL', name: 'Hebrew' }]);
+    tts.speak('שלום');
+    expect(tts.getStatus().hasLanguageVoice).toBe(true);
+  });
+
+  it('lists the languages the engine offers', () => {
+    const { tts } = makeService([
+      { lang: 'en-US', name: 'English' },
+      { lang: 'ar-001', name: 'Arabic' },
+    ]);
+    tts.speak('שלום');
+    expect(tts.getStatus().languages).toEqual(['ar-001', 'en-US']);
+  });
+
+  it('is case insensitive about the tag', () => {
+    expect(selectVoice([{ lang: 'IW-il', name: 'Hebrew' }], 'he-IL')).toBeDefined();
   });
 });

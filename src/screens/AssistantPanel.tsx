@@ -58,6 +58,18 @@ export default function AssistantPanel() {
     if (latest.id <= lastSpokenId.current) return;
 
     lastSpokenId.current = latest.id;
+
+    // Android refuses to read text in a language it has no voice for, and does so
+    // silently. Say why, once, instead of just being mysteriously quiet.
+    const status = tts.getStatus();
+    if (status.voiceCount > 0 && !status.hasLanguageVoice) {
+      setSoundReport(
+        'אין קול עברי מותקן במכשיר, ולכן אין הקראה. ' +
+          'הגדרות ← נגישות ← פלט טקסט לדיבור ← מנוע Google ← התקנת נתוני קול ← עברית.',
+      );
+      return;
+    }
+
     // Android holds the audio session briefly after speech recognition finishes, and
     // an utterance started inside that window is dropped without an error.
     tts.speak(latest.text, { delayMs: 350 });
@@ -149,16 +161,20 @@ export default function AssistantPanel() {
 
     globalThis.setTimeout(() => {
       const status = tts.getStatus();
+      // List what the engine actually offers. A device can have a Hebrew voice under
+      // an unexpected tag, and guessing from a yes/no answer wasted real time.
+      const languages = status.languages.join(', ');
+
       setSoundReport(
         status.voiceCount === 0
           ? 'המכשיר לא מדווח על אף קול מותקן.'
           : !status.hasLanguageVoice
-            ? `יש ${status.voiceCount} קולות, אבל אין קול עברי מותקן.`
+            ? `אין קול עברי. ${status.voiceCount} קולות זמינים: ${languages}`
             : status.state === 'error'
               ? `שגיאה: ${status.detail ?? 'לא ידוע'}`
               : status.state === 'spoke' || status.state === 'speaking'
                 ? 'הקול נשלח בהצלחה. אם לא שמעת — בדוק את עוצמת המדיה.'
-                : `מצב: ${status.state}`,
+                : `מצב: ${status.state} · קולות: ${languages}`,
       );
     }, 1200);
   }
