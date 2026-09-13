@@ -316,3 +316,29 @@ describe('Hebrew language tags', () => {
     expect(selectVoice([{ lang: 'IW-il', name: 'Hebrew' }], 'he-IL')).toBeDefined();
   });
 });
+
+describe('Android-style language tags', () => {
+  // Real devices report tags with underscores, which a naive comparison misses
+  // entirely — the voice is installed and usable but never selected.
+  it.each(['he_IL', 'iw_IL', 'HE_IL', 'he-IL'])('matches a voice tagged %s', (tag) => {
+    expect(selectVoice([{ lang: tag, name: 'Hebrew' }], 'he-IL')?.name).toBe('Hebrew');
+  });
+
+  it('ignores a script suffix on an unrelated voice', () => {
+    const voices = [
+      { lang: 'hi_IN_#Latn', name: 'Hindi' },
+      { lang: 'he_IL', name: 'Hebrew' },
+    ];
+    expect(selectVoice(voices, 'he-IL')?.name).toBe('Hebrew');
+  });
+
+  it('does not match an unrelated language', () => {
+    // The exact voice list from a real device with no Hebrew installed.
+    const voices = [
+      'de_DE', 'en_GB', 'en_US', 'es_ES', 'es_MX', 'es_US', 'fr_FR',
+      'hi_IN', 'hi_IN_#Latn', 'it_IT', 'pl_PL', 'pt_BR', 'ru_RU', 'th_TH', 'vi_VN',
+    ].map((lang) => ({ lang, name: lang }));
+
+    expect(selectVoice(voices, 'he-IL')).toBeUndefined();
+  });
+});

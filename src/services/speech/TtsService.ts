@@ -118,8 +118,19 @@ const LANGUAGE_ALIASES: Record<string, readonly string[]> = {
   iw: ['he', 'iw'],
 };
 
+/**
+ * Normalise a language tag for comparison.
+ *
+ * Android TTS engines report tags with UNDERSCORES — 'he_IL', not 'he-IL' — and
+ * sometimes a script suffix such as 'hi_IN_#Latn'. Comparing raw strings therefore
+ * fails against an installed voice that is perfectly usable.
+ */
+function normalizeTag(lang: string): string {
+  return lang.toLowerCase().replace(/_/g, '-');
+}
+
 function baseOf(lang: string): string {
-  return (lang.split('-')[0] ?? lang).toLowerCase();
+  return normalizeTag(lang).split('-')[0] ?? normalizeTag(lang);
 }
 
 /** The best voice for a language, or undefined to let the platform choose. */
@@ -127,7 +138,9 @@ export function selectVoice(
   voices: readonly SpeechSynthesisVoiceLike[],
   lang: string,
 ): SpeechSynthesisVoiceLike | undefined {
-  const exact = voices.find((voice) => voice.lang === lang);
+  const wantedTag = normalizeTag(lang);
+
+  const exact = voices.find((voice) => normalizeTag(voice.lang) === wantedTag);
   if (exact !== undefined) return exact;
 
   const wanted = LANGUAGE_ALIASES[baseOf(lang)] ?? [baseOf(lang)];
