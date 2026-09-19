@@ -2,13 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   GoogleAuthError,
   getAuthState,
+  hasGmailScope,
   requestAccessToken,
   signOut,
   subscribeToAuthState,
   type AuthState,
 } from '../services/calendar/auth';
 import { createGoogleCalendarProvider } from '../services/calendar/GoogleCalendarProvider';
+import { createGmailChannel } from '../services/messaging/GmailChannel';
 import { withChangeNotifications } from '../services/calendar/changes';
+import { loadContacts } from '../storage/contacts';
 import { handleTurn } from '../services/assistant/handleTurn';
 import { respond } from '../services/assistant/responder';
 import { systemClock } from '../utils/clock';
@@ -30,6 +33,14 @@ export interface AssistantMessage {
   text: string;
   /** Set on a success, so the user can jump to the event in Google Calendar. */
   link?: string;
+  /**
+   * A prepared WhatsApp conversation, for the channel the app cannot send on.
+   *
+   * Computed here rather than at click time on purpose: it is rendered as a plain
+   * anchor, and an anchor click is inherently a user gesture. Opening the app from a
+   * handler that ran after an await would be blocked by the browser instead.
+   */
+  whatsappUrl?: string;
   /** Outcome kind, used to colour the bubble. */
   outcome?: CommandOutcome['kind'];
 }
@@ -76,6 +87,15 @@ export function useAssistant(): UseAssistantResult {
     [],
   );
 
+  const gmail = useMemo(
+    () =>
+      createGmailChannel({
+        getAccessToken: requestAccessToken,
+        onAuthExpired: signOut,
+      }),
+    [],
+  );
+
   const append = useCallback((message: Omit<AssistantMessage, 'id'>) => {
     setMessages((current) => [...current, { ...message, id: nextId.current++ }]);
   }, []);
@@ -117,6 +137,9 @@ export function useAssistant(): UseAssistantResult {
           provider,
           clock: systemClock,
           state: conversation.current,
+          // Read fresh each turn rather than held in state: a contact added in the
+          // other tab a second ago is then usable immediately, with nothing to sync.
+          messaging: { contacts: loadContacts(), gmail, canSendMail: hasGmailScope() },
         });
         conversation.current = state;
 
@@ -127,13 +150,14 @@ export function useAssistant(): UseAssistantResult {
           ...(outcome.kind === 'created' && outcome.created.htmlLink !== undefined
             ? { link: outcome.created.htmlLink }
             : {}),
+          ...(outcome.kind === 'message-handoff' ? { whatsappUrl: outcome.url } : {}),
         });
       } finally {
         setSending(false);
         inFlight.current = false;
       }
     },
-    [append, provider],
+    [append, gmail, provider],
   );
 
   const connection: AssistantConnection =

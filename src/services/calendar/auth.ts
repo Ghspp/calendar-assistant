@@ -32,6 +32,27 @@
  */
 export const CALENDAR_EVENTS_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 
+/**
+ * Send mail as the user.
+ *
+ * Send-only: it cannot read, list or search the mailbox. Google classifies it as a
+ * RESTRICTED scope, which is why the project stays in Testing status — a published app
+ * asking for this would need verification review. For the project's own test users the
+ * consent flow is exactly the same as the calendar scope's.
+ */
+export const GMAIL_SEND_SCOPE = 'https://www.googleapis.com/auth/gmail.send';
+
+/**
+ * Everything the app asks for, in one grant.
+ *
+ * Both scopes are requested together rather than incrementally because a lazy request
+ * would have to open its popup several awaits after the tap that triggered it, and
+ * browsers block that. The cost is that connecting asks for mail access even for a
+ * user who only ever touches the calendar — which `grantedScopes` then makes visible
+ * rather than letting a send fail with an opaque 403.
+ */
+export const REQUESTED_SCOPES = [CALENDAR_EVENTS_SCOPE, GMAIL_SEND_SCOPE].join(' ');
+
 const GIS_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
 
 /** Renew slightly early so a request cannot die mid-flight. */
@@ -180,6 +201,8 @@ function loadGisScript(): Promise<void> {
 interface StoredToken {
   accessToken: string;
   expiresAtMs: number;
+  /** What Google actually granted, which can be less than what was asked for. */
+  grantedScopes: string[];
 }
 
 let storedToken: StoredToken | undefined;
@@ -215,6 +238,21 @@ export function getCachedAccessToken(): string | undefined {
   return storedToken.accessToken;
 }
 
+/**
+ * Whether the current grant actually permits sending mail.
+ *
+ * Google returns a perfectly valid token when the user grants calendar and refuses
+ * Gmail, and the refusal only surfaces as a 403 at send time. Checking up front turns
+ * that into a sentence explaining what to do.
+ *
+ * Unknown (no token yet) counts as permitted, so the UI does not hide the feature from
+ * someone who simply has not connected.
+ */
+export function hasGmailScope(): boolean {
+  if (storedToken === undefined) return true;
+  return storedToken.grantedScopes.includes(GMAIL_SEND_SCOPE);
+}
+
 /** Forget the token. The Google session itself is untouched. */
 export function signOut(): void {
   storedToken = undefined;
@@ -235,7 +273,7 @@ async function getTokenClient(clientId: string): Promise<GisTokenClient> {
   if (tokenClient === undefined) {
     tokenClient = gis.accounts.oauth2.initTokenClient({
       client_id: clientId,
-      scope: CALENDAR_EVENTS_SCOPE,
+      scope: REQUESTED_SCOPES,
       // Replaced per request below; GIS requires a callback at construction time.
       callback: () => undefined,
     });
@@ -302,6 +340,9 @@ export async function requestAccessToken(options: RequestTokenOptions): Promise<
         storedToken = {
           accessToken: response.access_token,
           expiresAtMs: Date.now() + expiresInSeconds * 1000 - EXPIRY_SAFETY_MARGIN_MS,
+          // Granular consent lets the user grant one scope and refuse the other, so
+          // what came back is the authority on what the app may do — not what it asked.
+          grantedScopes: (response.scope ?? '').split(' ').filter((s) => s.length > 0),
         };
         notify();
         resolve(response.access_token);

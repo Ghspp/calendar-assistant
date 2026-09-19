@@ -111,6 +111,82 @@ export const INTENT_VERBS = new Map<string, Intent>([
 ]);
 
 /**
+ * Verbs that carry an intent only when they take an object.
+ *
+ * 'תגיד' on its own is a discourse opener — 'תגיד מה יש לי מחר' is a QUERY, and putting
+ * it in INTENT_VERBS would let leftmost-wins steal that whole sentence. It means "send
+ * a message" only when a ל-object or a message noun follows, so the gate is what keeps
+ * both readings available. See `takesObject` in intent.ts.
+ */
+export const OBJECT_VERBS = new Map<string, Intent>([
+  ['שלח', 'SEND_MESSAGE'],
+  ['שלחי', 'SEND_MESSAGE'],
+  ['תשלח', 'SEND_MESSAGE'],
+  ['תשלחי', 'SEND_MESSAGE'],
+  // ל-stripping turns 'לשלוח' into stem 'שלוח', so the infinitive needs its own key.
+  ['לשלוח', 'SEND_MESSAGE'],
+  ['תגיד', 'SEND_MESSAGE'],
+  ['תגידי', 'SEND_MESSAGE'],
+  ['להגיד', 'SEND_MESSAGE'],
+  ['תמסור', 'SEND_MESSAGE'],
+  ['מסור', 'SEND_MESSAGE'],
+  ['למסור', 'SEND_MESSAGE'],
+  ['תכתוב', 'SEND_MESSAGE'],
+  ['כתוב', 'SEND_MESSAGE'],
+  ['לכתוב', 'SEND_MESSAGE'],
+]);
+
+/** How far past the verb the object may sit: 'שלח הודעה לדניאל' needs two. */
+export const OBJECT_LOOKAHEAD = 2;
+
+/** Nouns naming the thing being sent. Skipped when looking for the recipient. */
+export const MESSAGE_NOUNS = new Set([
+  'הודעה',
+  'הודעת',
+  'הודעות',
+  'מסר',
+  'וואטסאפ',
+  'ווטסאפ',
+  'סמס',
+  'מייל',
+  'אימייל',
+]);
+
+/**
+ * Words that can open a clause after ש.
+ *
+ * This is the POSITIVE test that separates the complementizer ש of 'שאני מאחר' from
+ * the plain ש of 'שלום'. A blocklist of ש-initial nouns would be endless; asking what
+ * follows the ש is decidable.
+ */
+export const CLAUSE_OPENERS = new Set([
+  'אני',
+  'אנחנו',
+  'אתה',
+  'אתם',
+  'הוא',
+  'היא',
+  'הם',
+  'הן',
+  'יש',
+  'אין',
+  'לא',
+  'כבר',
+  'זה',
+  'צריך',
+  'צריכה',
+  'אפשר',
+  'נראה',
+  'מחר',
+  'היום',
+  'הכל',
+  'תודה',
+]);
+
+/** Politeness and particles that may sit between the verb and the recipient. */
+export const RECIPIENT_SKIP = new Set(['לי', 'בבקשה', 'נא', 'את', 'מהר', 'תכף', 'עכשיו']);
+
+/**
  * Hour numerals, masculine and feminine. Used for both times and duration counts.
  * Two-word numerals (11, 12) live in NUMBER_WORD_PAIRS.
  */
@@ -337,3 +413,36 @@ export const TITLE_FILLERS = new Set([
   'זה',
   'שלי',
 ]);
+
+/**
+ * Stems that follow ל as grammar rather than as a person: 'לשעה', 'למחר', 'לשבת'.
+ *
+ * DERIVED from the vocabulary already declared above rather than retyped, so a word
+ * added to the date or duration lists automatically stops being mistaken for a contact
+ * name. Retyping it would rot the moment someone extends one of those maps.
+ *
+ * WEEKDAY_STEMS_REQUIRING_YOM is subtracted back out: a bare 'שני' is deliberately not
+ * a weekday for the date parser either, so 'תשלח לשני' is a person named שני.
+ */
+export const RECIPIENT_BLOCKLIST: ReadonlySet<string> = new Set(
+  [
+    ...DURATION_UNITS.keys(),
+    ...FIXED_DURATIONS.keys(),
+    ...NUMBER_WORDS.keys(),
+    ...RELATIVE_DAYS.keys(),
+    ...WEEKDAYS.keys(),
+    ...DAY_PARTS.keys(),
+    ...PERIOD_DAYS.keys(),
+    ...DUAL_PERIODS.keys(),
+    ...DURATION_MARKERS,
+    HOUR_MARKER_STEM,
+    // Pronoun suffixes that survive ל-stripping: 'לי', 'לך', 'לו', 'לה', 'לנו'.
+    'י',
+    'ך',
+    'ו',
+    'ה',
+    'נו',
+    'הם',
+    'כם',
+  ].filter((stem) => !WEEKDAY_STEMS_REQUIRING_YOM.has(stem)),
+);

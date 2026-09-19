@@ -9,12 +9,13 @@
  * anything; validation (Stage 2) and the conversation layer (Stage 6) act on its output.
  */
 
-import { detectIntent } from './intent';
+import { detectIntent, type IntentMatch } from './intent';
 import { findDate } from './dateParser';
 import { findRecurrence } from './recurrence';
 import { findDuration } from './durationParser';
+import { findMessageBody, findRecipient } from './messageParser';
 import { findTimes, questionFor, type TimeExpression } from './timeParser';
-import { matchPhrase, normalizeText, tokenize } from './normalize';
+import { matchPhrase, normalizeText, tokenize, type Token } from './normalize';
 import { FIRST_FREE_PHRASES } from './lexicon';
 import { extractTitle } from './titleExtractor';
 import type { Clock } from '../../utils/clock';
@@ -120,6 +121,10 @@ function computeMissing(
       if (!hasDate) missing.push('date');
       break;
 
+    // Handled entirely by buildSendMessage, which never reaches this switch. The case
+    // is here so the day someone removes that early return, this is a visible gap
+    // rather than a silent empty list.
+    case 'SEND_MESSAGE':
     case 'UNKNOWN':
       break;
   }
@@ -142,6 +147,45 @@ function computeConfidence(
   return Math.min(1, Number(score.toFixed(2)));
 }
 
+/**
+ * Assemble a send request.
+ *
+ * Kept separate from the scheduling pipeline entirely — it shares the tokenizer and
+ * nothing else, because none of the calendar slots mean anything here.
+ */
+function buildSendMessage(
+  rawText: string,
+  normalizedText: string,
+  tokens: Token[],
+  intentMatch: IntentMatch | undefined,
+): ParsedCommand {
+  const verbEnd = intentMatch === undefined ? 0 : Math.max(...intentMatch.tokens) + 1;
+
+  const recipient = findRecipient(tokens, verbEnd);
+  const bodyFrom = recipient === undefined ? verbEnd : Math.max(...recipient.tokens) + 1;
+  const body = findMessageBody(tokens, normalizedText, bodyFrom);
+
+  const missing: SlotName[] = [];
+  if (recipient === undefined) missing.push('recipient');
+  if (body === undefined) missing.push('messageBody');
+
+  let confidence = 0.35;
+  if (recipient !== undefined) confidence += 0.3;
+  if (body !== undefined) confidence += 0.3;
+
+  return {
+    intent: 'SEND_MESSAGE',
+    ...(recipient !== undefined ? { recipient: recipient.name } : {}),
+    ...(body !== undefined ? { messageBody: body.text } : {}),
+    missing,
+    // Free text has nothing to disambiguate — there is no second reading of a sentence.
+    ambiguities: [],
+    confidence: Number(confidence.toFixed(2)),
+    rawText,
+    normalizedText,
+  };
+}
+
 export function parseCommand(rawText: string, clock: Clock): ParsedCommand {
   const normalizedText = normalizeText(rawText);
   const tokens = tokenize(normalizedText);
@@ -150,6 +194,23 @@ export function parseCommand(rawText: string, clock: Clock): ParsedCommand {
   const intentMatch = detectIntent(tokens);
   const intent: Intent = intentMatch?.intent ?? 'UNKNOWN';
   intentMatch?.tokens.forEach((index) => consumed.add(index));
+
+  // A message has no date, hour or duration of its own — every word after the recipient
+  // is text a human will read. Returning here is what protects the 'מחר' of
+  // 'תשלח לאמא שהפגישה מחר נדחית': the scheduling matchers never run at all.
+  //
+  // Claiming the body up front and letting them run would NOT be equivalent. They check
+  // `consumed` only at their loop head; their continuation readers (parseTimeAt,
+  // readDurationBody, readNumber) read forward without consulting it, so a match
+  // starting just before the body could straddle into it. Not running them removes the
+  // class of bug rather than betting against it.
+  //
+  // The cost is that scheduled sends ('תשלח לאמא מחר בבוקר ש…') are out of scope: the
+  // time lands in the body. Supporting them later means gating the block below on the
+  // intent instead of returning, and bounding findDate to the left of the body.
+  if (intent === 'SEND_MESSAGE') {
+    return buildSendMessage(rawText, normalizedText, tokens, intentMatch);
+  }
 
   // Before the date: 'כל' is consumed here, while 'יום שני' is deliberately left so
   // the date parser can turn it into a concrete first occurrence.

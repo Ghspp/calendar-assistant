@@ -27,6 +27,7 @@ import { validateEvent } from '../validation/validateEvent';
 import { answerFindFree, answerQuery } from './queries';
 import { applyUpdate } from './updates';
 import { startDelete } from './deletes';
+import { startMessage, type MessagingOptions } from './messages';
 import type { ParsedCommand } from '../../types/parser';
 import type { CalendarEvent } from '../../types/calendar';
 import type { FreeSlot } from '../conflict/findFreeSlots';
@@ -36,6 +37,12 @@ export interface HandleCommandOptions {
   provider: CalendarProvider;
   clock: Clock;
   create?: CreateEventOptions;
+  /**
+   * Contacts and the mail channel. Optional because the calendar-only call sites
+   * (manual actions in useCalendarEvents) have no business supplying them; a send
+   * request then declines cleanly rather than half-working.
+   */
+  messaging?: MessagingOptions;
 }
 
 /** Intents Stage 4 acts on. Everything else is understood but declined, not guessed at. */
@@ -93,6 +100,16 @@ export async function executeCommand(
     } catch (error) {
       return toFailure(error);
     }
+  }
+
+  // Sending a message. Like deleting, this only ever gets as far as composing and
+  // asking — nothing is delivered until the conversation layer sees an explicit yes.
+  if (parsed.intent === 'SEND_MESSAGE') {
+    const messaging = options.messaging;
+    if (messaging === undefined) {
+      return { kind: 'message-unclear', reason: 'not-available' };
+    }
+    return startMessage(parsed, messaging);
   }
 
   if (!ACTIONABLE_INTENTS.has(parsed.intent)) {

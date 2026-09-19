@@ -47,11 +47,22 @@ export type ValidationResult =
 /** Longest event we accept. Anything beyond this is far more likely a parse error. */
 export const MAX_EVENT_MINUTES = MINUTES_PER_DAY;
 
+/**
+ * The question asked when a slot is empty.
+ *
+ * Typed as a total Record on purpose: adding a slot anywhere in the app fails to
+ * compile until its question is written, which is the only mechanism stopping a new
+ * slot from going missing in silence.
+ */
 const MISSING_SLOT_MESSAGES: Record<SlotName, string> = {
   title: 'לא הבנתי מה לקבוע.',
   date: 'באיזה תאריך לקבוע?',
   startTime: 'באיזו שעה לקבוע?',
   duration: 'ולכמה זמן?',
+  // Message slots. This validator only gates CREATE, so these are never reached from
+  // here — they exist so the Record stays total and the send flow can share the words.
+  recipient: 'למי לשלוח?',
+  messageBody: 'מה לכתוב?',
 };
 
 /**

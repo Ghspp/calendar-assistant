@@ -21,6 +21,7 @@ import { applyChangeToEvent } from './updates';
 import { parseUpdate } from './updateParsing';
 import { parseCommand } from '../parser';
 import { confirmDelete } from './deletes';
+import { confirmMessage } from './messages';
 import { readChoice, readConfirmation, readSeriesScope } from '../conversation/choices';
 import { CalendarError } from '../calendar/errors';
 import { isActionExpired, type PendingAction } from '../conversation/ConversationManager';
@@ -130,6 +131,16 @@ function pendingActionFor(
 
   if (outcome.kind === 'delete-scope') {
     return { kind: 'delete-scope', event: outcome.event, updatedAtMs };
+  }
+
+  if (outcome.kind === 'message-confirm') {
+    return {
+      kind: 'confirm-message',
+      contact: outcome.contact,
+      body: outcome.body,
+      channel: outcome.channel,
+      updatedAtMs,
+    };
   }
 
   if (outcome.kind === 'update-scope') {
@@ -269,6 +280,50 @@ async function resolvePendingAction(
     } catch (error) {
       return { outcome: toTurnFailure(error), state: clearPending() };
     }
+  }
+
+  if (action.kind === 'confirm-message') {
+    const answer = readConfirmation(text);
+
+    if (answer === 'no') {
+      return {
+        outcome: { kind: 'abandoned', message: 'בסדר, לא שלחתי כלום.' },
+        state: clearPending(),
+      };
+    }
+
+    if (answer === 'yes') {
+      const messaging = options.messaging;
+      if (messaging === undefined) {
+        return {
+          outcome: { kind: 'message-unclear', reason: 'not-available' },
+          state: clearPending(),
+        };
+      }
+
+      try {
+        const outcome = await confirmMessage(
+          action.contact,
+          action.body,
+          action.channel,
+          messaging,
+        );
+        return { outcome, state: clearPending() };
+      } catch (error) {
+        return { outcome: toTurnFailure(error), state: clearPending() };
+      }
+    }
+
+    // Unclear. Ask again — an unrecognised noise is not permission to send.
+    return {
+      outcome: {
+        kind: 'message-confirm',
+        contact: action.contact,
+        body: action.body,
+        channel: action.channel,
+      },
+      state: { action: { ...action, updatedAtMs: clock.now().getTime() } },
+    };
   }
 
   if (action.kind === 'update-scope') {

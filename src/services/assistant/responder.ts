@@ -449,6 +449,45 @@ export function respond(outcome: CommandOutcome, clock: Clock): string {
     case 'delete-unclear':
       return 'לא הבנתי איזה אירוע לבטל.';
 
+    case 'message-confirm': {
+      // The whole message is read back, never summarised. This sentence is the user's
+      // only chance to catch a misheard word before it reaches another person.
+      const how =
+        outcome.channel === 'gmail'
+          ? `במייל ל${outcome.contact.name}`
+          : `בוואטסאפ ל${outcome.contact.name}`;
+      return `לשלוח ${how}: "${outcome.body}"?`;
+    }
+
+    case 'message-sent':
+      return `שלחתי ל${outcome.contact.name}.`;
+
+    case 'message-handoff':
+      // Deliberately not 'שלחתי'. WhatsApp cannot be sent for the user, and saying
+      // otherwise would leave them believing a message went out that did not.
+      return `הכנתי את ההודעה ל${outcome.contact.name}. פתח את וואטסאפ ולחץ שלח.`;
+
+    case 'message-contact-not-found':
+      return `לא מצאתי איש קשר בשם ${outcome.name}. אפשר להוסיף אותו במסך אנשי הקשר.`;
+
+    case 'message-contact-ambiguous': {
+      const listed = outcome.matches
+        .map((contact, index) => `${index + 1}. ${contact.name}`)
+        .join(' ');
+      return `יש לי ${outcome.matches.length} אנשי קשר בשם הזה: ${listed} למי לשלוח?`;
+    }
+
+    case 'message-no-channel':
+      return `ל${outcome.contact.name} אין מייל או טלפון שמור, אז אין לאן לשלוח.`;
+
+    case 'message-unclear':
+      if (outcome.reason === 'no-recipient') return 'למי לשלוח?';
+      if (outcome.reason === 'no-body') return 'מה לכתוב?';
+      if (outcome.reason === 'no-mail-permission') {
+        return 'אין לי הרשאה לשלוח מייל. לחץ נתק ואז התחבר שוב, ואשר גם את הרשאת השליחה.';
+      }
+      return 'שליחת הודעות לא זמינה כרגע.';
+
     case 'abandoned':
       return outcome.message;
 

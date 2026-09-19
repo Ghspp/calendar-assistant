@@ -18,6 +18,7 @@ import type {
   TimedCalendarEvent,
 } from '../../types/calendar';
 import type { UpdateChange } from '../assistant/updateParsing';
+import type { Contact } from '../../storage/contacts';
 import { parseCommand } from '../parser';
 import {
   isCancellation,
@@ -78,6 +79,19 @@ export type PendingAction =
       kind: 'update-scope';
       event: TimedCalendarEvent;
       change: UpdateChange;
+      updatedAtMs: number;
+    }
+  /**
+   * A message is composed and waiting for a yes. NOTHING has been sent.
+   *
+   * The exact text is held here rather than re-derived on confirmation, so what goes
+   * out is word-for-word what the user was read back.
+   */
+  | {
+      kind: 'confirm-message';
+      contact: Contact;
+      body: string;
+      channel: 'gmail' | 'whatsapp';
       updatedAtMs: number;
     }
   /**
@@ -189,6 +203,12 @@ function answersQuestion(merged: CommandSlots, pending: PendingRequest): boolean
     case 'title':
       // A title answer is taken literally, so anything at all counts.
       return merged.title !== undefined;
+    case 'recipient':
+    case 'messageBody':
+      // This accumulator only ever builds a CREATE; a half-finished send is tracked as
+      // a PendingAction instead. Refusing here is the safe direction anyway — it keeps
+      // the utterance from being folded into a scheduling request.
+      return false;
   }
 }
 

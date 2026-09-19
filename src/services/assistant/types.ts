@@ -18,6 +18,7 @@ import type { CreatedEvent } from '../calendar/CalendarProvider';
 import type { ValidationError } from '../validation/validateEvent';
 import type { CalendarErrorKind } from '../calendar/errors';
 import type { UpdateChange } from './updateParsing';
+import type { Contact } from '../../storage/contacts';
 
 /**
  * One reading of an availability question.
@@ -173,6 +174,40 @@ export type CommandOutcome =
   | { kind: 'delete-not-found'; timeZone: string; target: string }
   /** We could not tell what to delete. Nothing was deleted. */
   | { kind: 'delete-unclear' }
+  /**
+   * A message is composed and waiting for a yes. NOTHING has been sent.
+   *
+   * Reaching this outcome is unconditional for a send request — there is no path that
+   * delivers a message without the user first seeing the recipient and the exact text.
+   * A message cannot be recalled, so the confirmation is not optional the way it might
+   * be for a reversible action.
+   */
+  | {
+      kind: 'message-confirm';
+      contact: Contact;
+      body: string;
+      channel: 'gmail' | 'whatsapp';
+    }
+  /** The message went out by itself. Only reachable after an explicit confirmation. */
+  | { kind: 'message-sent'; contact: Contact; body: string }
+  /**
+   * WhatsApp cannot be sent for the user, so the chat is opened with the text ready.
+   *
+   * Reported separately from 'message-sent' because it is NOT sent — the user still
+   * has to press send, and saying otherwise would be a lie about what happened.
+   */
+  | { kind: 'message-handoff'; contact: Contact; body: string; url: string }
+  /** No contact by that name. Nothing was sent. */
+  | { kind: 'message-contact-not-found'; name: string }
+  /** Several contacts matched. NOTHING was sent — the user must choose. */
+  | { kind: 'message-contact-ambiguous'; name: string; matches: Contact[] }
+  /** The contact has neither an email nor a phone. Nothing was sent. */
+  | { kind: 'message-no-channel'; contact: Contact }
+  /** The request could not be read as a message. Nothing was sent. */
+  | {
+      kind: 'message-unclear';
+      reason: 'no-recipient' | 'no-body' | 'not-available' | 'no-mail-permission';
+    }
   /** The user declined a pending confirmation, or backed out of a choice. */
   | { kind: 'abandoned'; message: string }
   /** A command we understood but do not act on. */

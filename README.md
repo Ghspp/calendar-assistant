@@ -1,8 +1,8 @@
 # Voice Calendar Assistant
 
-A Hebrew voice-controlled personal calendar assistant that schedules events in Google Calendar.
-Zero recurring cost: a deterministic local parser instead of an LLM, the browser's built-in speech
-API, and Google Calendar's free quota.
+A Hebrew voice-controlled personal assistant that schedules events in Google Calendar and sends
+messages to your contacts. Zero recurring cost: a deterministic local parser instead of an LLM,
+the browser's built-in speech API, and Google's free quotas.
 
 ## Status
 
@@ -19,12 +19,10 @@ API, and Google Calendar's free quota.
 | 8 | Editing and deleting, with match disambiguation | Done |
 | 9 | Visual calendar with manual add and delete | Done |
 | 10 | Installable PWA, offline shell, deployment | Done |
+| 11 | Repeating events, series scope, messaging a contact | Done |
 
-All ten stages are complete.
-
-**The app can now create events in your real calendar.** It still cannot edit or delete them —
-those arrive in Stage 8, together with the disambiguation rules that stop an ambiguous match being
-deleted by accident.
+**The app reads, creates, edits and deletes events in your real calendar, and can send a message
+to a contact.** Everything that changes something asks first.
 
 An event is only ever written when all of the following hold: the command was understood, every
 slot was filled, no hour was left ambiguous, and a freshly fetched view of that day showed no
@@ -55,11 +53,14 @@ API's free quota is one million requests per day, and this app makes a handful.
 2. Name it anything (for example `voice-calendar`) and click **Create**.
 3. Make sure it is the selected project in the top bar before continuing.
 
-### 2. Enable the Google Calendar API
+### 2. Enable the APIs
 
 1. Go to **APIs & Services → Library**, or <https://console.cloud.google.com/apis/library>.
-2. Search for **Google Calendar API** and open it.
-3. Click **Enable**.
+2. Search for **Google Calendar API** and open it. Click **Enable**.
+3. Go back to the Library, search for **Gmail API**, open it and click **Enable**.
+
+The Gmail API is what lets the assistant send a message to a contact from your own address.
+Skip it if you do not want that feature — everything else works without it.
 
 ### 3. Configure the OAuth consent screen
 
@@ -73,27 +74,36 @@ API's free quota is one million requests per day, and this app makes a handful.
 
    ```
    https://www.googleapis.com/auth/calendar.events
+   https://www.googleapis.com/auth/gmail.send
    ```
 
-   This is the narrowest scope that permits creating an event — Google offers no finer-grained
-   "create only" variant. It covers reading and writing events, and nothing else: it cannot touch
-   calendar settings, sharing, or any calendar you have not granted.
+   `calendar.events` is the narrowest scope that permits creating an event — Google offers no
+   finer-grained "create only" variant. It covers reading and writing events, and nothing else: it
+   cannot touch calendar settings, sharing, or any calendar you have not granted.
 
-   > **Upgrading from the Stage 3 read-only scope?** Replace
-   > `calendar.events.readonly` with `calendar.events`. An existing grant does not cover the wider
+   `gmail.send` lets the assistant send a message to a contact from your own address. It is
+   **send-only**: it cannot read, list or search your mailbox. Leave it out if you do not want
+   the messaging feature.
+
+   > **Adding a scope to an app you already connected?** An existing grant does not cover a wider
    > scope, so Google will show the consent screen again on your next connect. That is expected. If
-   > you get a `permission-denied` error when creating, click **נתק** in the app and connect again
-   > to pick up the new grant.
+   > a send fails with a permission error, click **נתק** in the app and connect again to pick up
+   > the new grant.
+   >
+   > Google's consent screen lets you tick one scope and refuse the other. If you grant the
+   > calendar but refuse Gmail, the calendar keeps working and only sending fails — with a message
+   > telling you to reconnect.
 5. On the **Test users** step, click **Add users** and add **your own Google account address**.
    This is the important step — without it you will get `access_denied` when you try to connect.
 6. Finish the wizard. **Leave the publishing status as "Testing".** Do not click *Publish app*.
 
 > **Why leave it in Testing?**
-> Calendar scopes are classified as *sensitive*, so a published app would need to go through
-> Google's verification review. In Testing status you can add up to 100 test users and use the app
-> immediately with no review. The only cost is an *"Google hasn't verified this app"* interstitial
-> the first time you connect — click **Advanced → Go to … (unsafe)** to continue. That warning is
-> about Google not having reviewed *your own* app; it is expected here.
+> Calendar scopes are classified as *sensitive* and `gmail.send` is *restricted*, so a published
+> app would need to go through Google's verification review. In Testing status you can add up to
+> 100 test users and use the app immediately with no review. The only cost is an *"Google hasn't
+> verified this app"* interstitial the first time you connect — click **Advanced → Go to …
+> (unsafe)** to continue. That warning is about Google not having reviewed *your own* app; it is
+> expected here.
 
 ### 4. Create the OAuth client ID
 
@@ -436,6 +446,37 @@ Privacy: Chrome streams the audio to Google's servers for transcription. Calenda
 leave the device except to the Calendar API, and all parsing is local — but the raw voice clip is
 not processed on-device. `SpeechProvider` is an interface, so an on-device Whisper provider could
 be added later without touching the UI.
+
+### Messaging a contact
+
+`תשלח לאמא שאני מאחר` composes a message and asks before it goes anywhere.
+
+**Nothing is ever sent without confirmation.** The assistant reads the recipient and the exact
+text back, and only an explicit `כן` delivers it. This is the same rule deleting an event follows,
+for a stronger reason: a deleted event can be recreated, a sent message cannot be unsent. Speech
+recognition mishears names constantly, so an ambiguous name is listed rather than picked.
+
+Two channels, chosen per contact:
+
+| The contact has | What happens |
+|---|---|
+| An email address | Sent automatically from your own Gmail address. Nothing else to do. |
+| Only a phone number | WhatsApp opens with the message already typed. **You press send.** |
+| Neither | The assistant says so and sends nothing. |
+
+**Why WhatsApp is not automatic.** There is no free — or paid — way to send from your personal
+WhatsApp account out of a browser. The Business Cloud API sends from a separate business number
+under template rules; the unofficial libraries need a server running your own session 24/7 and
+risk the account being banned. The official click-to-chat link is the honest option, and the app
+reports it as "prepared", never as "sent".
+
+Contacts live in `localStorage` on the device and are never synced anywhere. Add them by typing,
+or — on Chrome for Android — with the system contact picker, which returns only the entries you
+select and never the whole address book.
+
+The parser treats a message as text, not as slots: `תשלח לאמא שהפגישה מחר נדחית` keeps `מחר` in
+the message instead of reading it as a date. It does this by not running the scheduling matchers
+at all on a send request, which is also why scheduling a message for later is not supported.
 
 ### Notifications
 

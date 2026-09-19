@@ -3,6 +3,7 @@ import './App.css';
 import { useTheme } from './hooks/useTheme';
 import AssistantPanel from './screens/AssistantPanel';
 import CalendarScreen from './screens/CalendarScreen';
+import ContactsScreen from './screens/ContactsScreen';
 import type { ThemePreference } from './storage/prefs';
 
 const THEME_OPTIONS: Array<{ value: ThemePreference; label: string }> = [
@@ -12,11 +13,12 @@ const THEME_OPTIONS: Array<{ value: ThemePreference; label: string }> = [
 ];
 
 /**
- * The app shell: a theme switch, and two tabs over the assistant and the calendar.
+ * The app shell: a theme switch, and tabs over the assistant, the calendar and the
+ * contact book the assistant sends messages to.
  */
 export default function App() {
   const { theme, setTheme } = useTheme();
-  const [tab, setTab] = useState<'assistant' | 'calendar'>('assistant');
+  const [tab, setTab] = useState<'assistant' | 'calendar' | 'contacts'>('assistant');
 
   return (
     <main className="app-shell">
@@ -43,6 +45,9 @@ export default function App() {
         <button type="button" aria-pressed={tab === 'calendar'} onClick={() => setTab('calendar')}>
           📅 יומן
         </button>
+        <button type="button" aria-pressed={tab === 'contacts'} onClick={() => setTab('contacts')}>
+          👥 אנשי קשר
+        </button>
       </nav>
 
       {/* Both screens stay mounted so switching tabs does not discard a half-finished
@@ -52,6 +57,9 @@ export default function App() {
       </div>
       <div hidden={tab !== 'calendar'}>
         <CalendarScreen />
+      </div>
+      <div hidden={tab !== 'contacts'}>
+        <ContactsScreen />
       </div>
     </main>
   );

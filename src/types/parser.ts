@@ -8,10 +8,23 @@
 
 import type { Recurrence } from '../services/parser/recurrence';
 
-export type Intent = 'CREATE' | 'QUERY' | 'FIND_FREE' | 'UPDATE' | 'DELETE' | 'UNKNOWN';
+export type Intent =
+  | 'CREATE'
+  | 'QUERY'
+  | 'FIND_FREE'
+  | 'UPDATE'
+  | 'DELETE'
+  | 'SEND_MESSAGE'
+  | 'UNKNOWN';
 
 /** Slots that can be reported as missing and asked about in follow-up questions. */
-export type SlotName = 'title' | 'date' | 'startTime' | 'duration';
+export type SlotName =
+  | 'title'
+  | 'date'
+  | 'startTime'
+  | 'duration'
+  | 'recipient'
+  | 'messageBody';
 
 /**
  * An hour the parser refused to resolve.
@@ -64,6 +77,22 @@ export interface ParsedCommand {
    * follows it.
    */
   recurrence?: Recurrence;
+  /**
+   * Who a message is for, as spoken with the ל particle removed ('אמא', 'דניאל').
+   *
+   * Deliberately an UNRESOLVED string. Matching it to a stored contact is I/O and the
+   * parser is pure, so the assistant layer resolves it — and asks which one it meant
+   * rather than picking, exactly as it does for an ambiguous event title.
+   */
+  recipient?: string;
+  /**
+   * The message to send, verbatim.
+   *
+   * A contiguous slice of `normalizedText`, never re-joined from tokens and never
+   * filtered, because a human reads this text. The only character dropped is the ש of
+   * 'שאני מאחר', which is a marker rather than part of the message.
+   */
+  messageBody?: string;
   /** Slots with no information at all. Drives 'באיזו שעה לקבוע?' style questions. */
   missing: SlotName[];
   /** Slots that had information the parser refused to resolve. */

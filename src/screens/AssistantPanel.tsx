@@ -21,6 +21,7 @@ const EXAMPLES = [
   'תקבע לי אימון מחר',
   'מה יש לי מחר?',
   'מצא לי שעה פנויה של שעתיים מחר',
+  'תשלח לאמא שאני מאחר',
 ];
 
 function bubbleClass(message: AssistantMessage): string {
@@ -288,6 +289,18 @@ export default function AssistantPanel() {
                   rel="noreferrer noopener"
                 >
                   פתח ביומן Google ↗
+                </a>
+              ) : null}
+              {/* An anchor, not a button calling window.open: a click on a link is
+                  inherently a user gesture, so the browser lets WhatsApp through. */}
+              {message.whatsappUrl !== undefined ? (
+                <a
+                  className="assistant__link"
+                  href={message.whatsappUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  פתח בוואטסאפ ↗
                 </a>
               ) : null}
             </div>
