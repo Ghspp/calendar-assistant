@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { formatVersion } from './src/utils/version';
 
 /**
  * Base path.
@@ -23,7 +24,7 @@ export default defineConfig({
      * workflow passes GitHub's run number, which increases by one each time it
      * publishes; a local build has no such number and says so.
      */
-    __APP_VERSION__: JSON.stringify(process.env['APP_VERSION'] ?? 'dev'),
+    __APP_VERSION__: JSON.stringify(formatVersion(process.env['APP_VERSION'])),
   },
 
   plugins: [
