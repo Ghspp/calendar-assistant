@@ -3,7 +3,6 @@ import {
   GoogleAuthError,
   getAuthState,
   requestAccessToken,
-  revokeAccess,
   signOut,
   subscribeToAuthState,
   type AuthState,
@@ -42,7 +41,6 @@ export interface UseAssistantResult {
   sending: boolean;
   connect: () => Promise<void>;
   disconnect: () => void;
-  forgetPermission: () => void;
   send: (text: string) => Promise<void>;
   clear: () => void;
 }
@@ -154,7 +152,6 @@ export function useAssistant(): UseAssistantResult {
     sending,
     connect,
     disconnect: signOut,
-    forgetPermission: revokeAccess,
     send,
     clear: useCallback(() => {
       setMessages([]);

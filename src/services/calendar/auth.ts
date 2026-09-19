@@ -221,19 +221,6 @@ export function signOut(): void {
   notify();
 }
 
-/**
- * Forget the token AND revoke the grant, so the next connect shows full consent.
- * Useful when changing scopes during development.
- */
-export function revokeAccess(): void {
-  const token = storedToken?.accessToken;
-  storedToken = undefined;
-  notify();
-  if (token !== undefined && globalThis.google !== undefined) {
-    globalThis.google.accounts.oauth2.revoke(token);
-  }
-}
-
 async function getTokenClient(clientId: string): Promise<GisTokenClient> {
   await loadGisScript();
 
@@ -342,11 +329,3 @@ export async function requestAccessToken(options: RequestTokenOptions): Promise<
   }
 }
 
-/** Test seam: reset all module state between tests. */
-export function resetAuthForTests(): void {
-  storedToken = undefined;
-  tokenClient = undefined;
-  inFlight = undefined;
-  scriptPromise = undefined;
-  listeners.clear();
-}
