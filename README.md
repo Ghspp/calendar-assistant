@@ -352,6 +352,26 @@ Day-part words narrow a free-slot search (`מחר בערב` searches 17:00–23:
 results use exactly the same exclusion rules as conflict detection, so the two can never
 disagree about whether a slot is free.
 
+### Repeating events
+
+```
+"תקבע לי חוג כדורגל כל יום שני בחמש אחר הצהריים לשעה"
+  →  "קבעתי חוג כדורגל כל יום שני בין 17:00 ל־18:00, החל ממחר."
+```
+
+Also `כל יום`, `כל יומיים`, `כל שבועיים`, `כל חודש`, and several days at once —
+`כל יום שני ורביעי`.
+
+Three things worth knowing:
+
+- **A repetition needs an explicit `כל`.** An ordinary command can never become a series
+  by accident, which would be both easy to miss and tedious to undo.
+- **The rule is said back to you.** A reply that reads `כל יום שני` is the moment to catch a
+  repetition you did not intend.
+- **Only the FIRST occurrence is conflict-checked.** A weekly series stretches indefinitely, so
+  checking every future instance is neither possible nor meaningful — a clash six months out may
+  not exist yet. The first occurrence is the one that can be verified.
+
 ### Letting the assistant choose the hour
 
 ```

@@ -6,6 +6,8 @@
  * and the conversation layer (Stage 6) to act on.
  */
 
+import type { Recurrence } from '../services/parser/recurrence';
+
 export type Intent = 'CREATE' | 'QUERY' | 'FIND_FREE' | 'UPDATE' | 'DELETE' | 'UNKNOWN';
 
 /** Slots that can be reported as missing and asked about in follow-up questions. */
@@ -55,6 +57,13 @@ export interface ParsedCommand {
    * which is not a guess about what they meant, but a computation they asked for.
    */
   useFirstFreeSlot?: boolean;
+  /**
+   * How the event repeats, when the user said 'כל …'.
+   *
+   * The date slot still holds the FIRST occurrence; this is only the rule that
+   * follows it.
+   */
+  recurrence?: Recurrence;
   /** Slots with no information at all. Drives 'באיזו שעה לקבוע?' style questions. */
   missing: SlotName[];
   /** Slots that had information the parser refused to resolve. */

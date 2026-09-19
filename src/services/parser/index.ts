@@ -11,6 +11,7 @@
 
 import { detectIntent } from './intent';
 import { findDate } from './dateParser';
+import { findRecurrence } from './recurrence';
 import { findDuration } from './durationParser';
 import { findTimes, questionFor, type TimeExpression } from './timeParser';
 import { matchPhrase, normalizeText, tokenize } from './normalize';
@@ -150,6 +151,11 @@ export function parseCommand(rawText: string, clock: Clock): ParsedCommand {
   const intent: Intent = intentMatch?.intent ?? 'UNKNOWN';
   intentMatch?.tokens.forEach((index) => consumed.add(index));
 
+  // Before the date: 'כל' is consumed here, while 'יום שני' is deliberately left so
+  // the date parser can turn it into a concrete first occurrence.
+  const recurrenceMatch = findRecurrence(tokens, consumed);
+  recurrenceMatch?.tokens.forEach((index) => consumed.add(index));
+
   const dateMatch = findDate(tokens, consumed, clock);
   dateMatch?.tokens.forEach((index) => consumed.add(index));
 
@@ -253,6 +259,7 @@ export function parseCommand(rawText: string, clock: Clock): ParsedCommand {
     ...(endTime !== undefined ? { endTime } : {}),
     ...(durationMinutes !== undefined ? { durationMinutes } : {}),
     ...(useFirstFreeSlot ? { useFirstFreeSlot: true } : {}),
+    ...(recurrenceMatch !== undefined ? { recurrence: recurrenceMatch.recurrence } : {}),
     missing,
     ambiguities,
     confidence,

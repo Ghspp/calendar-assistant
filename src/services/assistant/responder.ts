@@ -11,6 +11,7 @@ import { instantToZonedTime } from '../../utils/time';
 import { dateFromOffset } from '../parser/dateParser';
 import type { Conflict } from '../conflict/detectConflicts';
 import type { CalendarEvent } from '../../types/calendar';
+import type { Recurrence } from '../parser/recurrence';
 import type { CommandOutcome } from './types';
 
 /** Hebrew weekday names, indexed as JavaScript's getDay(): 0 = Sunday. */
@@ -215,6 +216,36 @@ function describeFreeSlots(
   return `${when}${scope} אתה פנוי ${listed}.`;
 }
 
+/** Weekday names in the form used after 'כל'. */
+const EVERY_WEEKDAY = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'] as const;
+
+/** 'כל יום שני', 'כל יום', 'כל שבועיים' — the rule, said back in Hebrew. */
+export function describeRecurrence(recurrence: Recurrence): string {
+  const { frequency, interval, byWeekday } = recurrence;
+
+  if (byWeekday !== undefined && byWeekday.length > 0) {
+    const names = byWeekday.map((day) =>
+      day === 6 ? 'שבת' : `יום ${EVERY_WEEKDAY[day] ?? ''}`.trim(),
+    );
+    const joined =
+      names.length === 1
+        ? names[0]
+        : `${names.slice(0, -1).join(', ')} ו${names[names.length - 1]}`;
+    return `כל ${joined}`;
+  }
+
+  if (interval === 2) {
+    return frequency === 'daily' ? 'כל יומיים' : frequency === 'weekly' ? 'כל שבועיים' : 'כל חודשיים';
+  }
+
+  if (interval > 2) {
+    const unit = frequency === 'daily' ? 'ימים' : frequency === 'weekly' ? 'שבועות' : 'חודשים';
+    return `כל ${interval} ${unit}`;
+  }
+
+  return frequency === 'daily' ? 'כל יום' : frequency === 'weekly' ? 'כל שבוע' : 'כל חודש';
+}
+
 /** 'שעה' / 'שעתיים' / '90 דקות' — for reporting back what was searched for. */
 export function describeDuration(minutes: number): string {
   if (minutes === 60) return 'שעה';
@@ -280,9 +311,16 @@ export function respond(outcome: CommandOutcome, clock: Clock): string {
   switch (outcome.kind) {
     case 'created': {
       const { event } = outcome;
+
+      // A series must not read like a one-off. Saying 'כל יום שני' back is also the
+      // user's chance to catch a rule they did not intend.
       const sentence =
-        `קבעתי ${event.title} ${describeDate(event.date, clock)} ` +
-        `${describeTimeRange(event.startTime, event.endTime)}.`;
+        event.recurrence !== undefined
+          ? `קבעתי ${event.title} ${describeRecurrence(event.recurrence)} ` +
+            `${describeTimeRange(event.startTime, event.endTime)}, ` +
+            `החל מ${describeDateBare(event.date, clock)}.`
+          : `קבעתי ${event.title} ${describeDate(event.date, clock)} ` +
+            `${describeTimeRange(event.startTime, event.endTime)}.`;
 
       if (outcome.informational.length === 0) return sentence;
 

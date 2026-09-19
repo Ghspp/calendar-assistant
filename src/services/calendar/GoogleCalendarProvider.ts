@@ -16,6 +16,7 @@ import type {
   TimeRangeQuery,
 } from './CalendarProvider';
 import { buildReminders } from '../notifications/reminders';
+import { buildRrule } from './rrule';
 import { calendarError, kindFromStatus } from './errors';
 import { mapGoogleEvents, type GoogleEventsResponse } from './googleMapping';
 import { APP_TIME_ZONE } from '../../utils/clock';
@@ -193,11 +194,17 @@ export function createGoogleCalendarProvider(
     // token has lapsed it is legitimate to ask for a new one rather than fail.
     const token = await options.getAccessToken({ interactive: true });
 
+    // A rule that cannot be expressed is dropped rather than guessed at: a one-off
+    // event is a far smaller surprise than one repeating on the wrong days forever.
+    const rrule =
+      event.recurrence !== undefined ? buildRrule(event.recurrence) : undefined;
+
     const body = {
       summary: event.title,
       start: { dateTime: event.interval.start.toISOString(), timeZone: event.timeZone },
       end: { dateTime: event.interval.end.toISOString(), timeZone: event.timeZone },
       reminders: buildReminders(createOptions?.reminders),
+      ...(rrule !== undefined ? { recurrence: [rrule] } : {}),
     };
 
     const url = `${CALENDAR_API_BASE}/calendars/${encodeURIComponent(calendarId)}/events`;

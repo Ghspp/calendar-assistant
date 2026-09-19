@@ -214,6 +214,7 @@ export function validateEvent(command: ParsedCommand, clock: Clock): ValidationR
       durationMinutes,
       timeZone,
       interval: { start, end },
+      ...(command.recurrence !== undefined ? { recurrence: command.recurrence } : {}),
     },
   };
 }

@@ -6,6 +6,8 @@
  * another provider could be added without touching it.
  */
 
+import type { Recurrence } from '../services/parser/recurrence';
+
 /** A half-open interval [start, end) of absolute instants. */
 export interface TimeInterval {
   start: Date;
@@ -77,4 +79,6 @@ export interface StructuredEvent {
   timeZone: string;
   /** The same event as absolute instants — what conflict detection compares. */
   interval: TimeInterval;
+  /** Repetition rule, when the event is a series rather than a one-off. */
+  recurrence?: Recurrence;
 }
