@@ -187,6 +187,14 @@ export type CommandOutcome =
       contact: Contact;
       body: string;
       channel: 'gmail' | 'whatsapp';
+      /** The user asked to send it later, which this app cannot do. Said, not ignored. */
+      cannotSchedule?: true;
+    }
+  /** A channel was named that this contact cannot be reached on. Nothing was sent. */
+  | {
+      kind: 'message-channel-unavailable';
+      contact: Contact;
+      channel: 'gmail' | 'whatsapp';
     }
   /**
    * The contact can be reached two ways, so the question names both. NOTHING is sent.
@@ -199,6 +207,7 @@ export type CommandOutcome =
       contact: Contact;
       body: string;
       channels: Array<'gmail' | 'whatsapp'>;
+      cannotSchedule?: true;
     }
   /** The message went out by itself. Only reachable after an explicit confirmation. */
   | { kind: 'message-sent'; contact: Contact; body: string }
@@ -212,7 +221,13 @@ export type CommandOutcome =
   /** No contact by that name. Nothing was sent. */
   | { kind: 'message-contact-not-found'; name: string }
   /** Several contacts matched. NOTHING was sent — the user must choose. */
-  | { kind: 'message-contact-ambiguous'; name: string; matches: Contact[] }
+  | {
+      kind: 'message-contact-ambiguous';
+      name: string;
+      matches: Contact[];
+      /** Held so answering the question finishes the request rather than restarting it. */
+      body: string;
+    }
   /** The contact has neither an email nor a phone. Nothing was sent. */
   | { kind: 'message-no-channel'; contact: Contact }
   /** The request could not be read as a message. Nothing was sent. */

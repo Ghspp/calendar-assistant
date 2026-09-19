@@ -146,6 +146,60 @@ describe('the message body is verbatim', () => {
   );
 });
 
+describe('nothing said between the recipient and the message is discarded', () => {
+  /*
+   * These all used to vanish. The complementizer scan jumped straight to the ש, and
+   * unlike the calendar path there is no title extractor to catch the residue — so
+   * 'מחר בבוקר' and 'בוואטסאפ' were thrown away with no diagnostic at all.
+   */
+
+  it('records a stated channel instead of losing it', () => {
+    expect(parse('תשלח לדניאל בוואטסאפ שאני בדרך')).toMatchObject({
+      recipient: 'דניאל',
+      messageBody: 'אני בדרך',
+      channel: 'whatsapp',
+    });
+
+    expect(parse('תשלח לדניאל במייל שאני בדרך')).toMatchObject({
+      recipient: 'דניאל',
+      channel: 'gmail',
+    });
+  });
+
+  it.each([
+    'תשלח לאמא מחר בבוקר שאני מאחר',
+    'תשלח לאמא בשמונה בערב שאני מאחר',
+    'תשלח לאמא מחר שאני מאחר',
+  ])('notices the timing request in %s', (text) => {
+    const parsed = parse(text);
+    expect(parsed.scheduleAttempt).toBe(true);
+    // The timing words must not end up glued to the name.
+    expect(parsed.recipient).toBe('אמא');
+    expect(parsed.messageBody).toBe('אני מאחר');
+  });
+
+  it('keeps extra name words with the name', () => {
+    expect(parse('תשלח לאמא של דניאל שאני מאחר').recipient).toBe('אמא של דניאל');
+    expect(parse('תשלח לדני אל שאני מאחר').recipient).toBe('דני אל');
+  });
+
+  it('leaves an utterance with no gap exactly as it was', () => {
+    // The gap is only ever non-empty when a later anchor exists, so this — the case the
+    // single-token rule was written to protect — is untouched.
+    expect(parse('תשלח לרותי תודה רבה על היום')).toMatchObject({
+      recipient: 'רותי',
+      messageBody: 'תודה רבה על היום',
+    });
+    expect(parse('תשלח לרותי תודה רבה על היום').channel).toBeUndefined();
+  });
+
+  it('does not invent a channel or a schedule when none was said', () => {
+    const parsed = parse('תשלח לאמא שאני מאחר');
+    expect(parsed.channel).toBeUndefined();
+    expect(parsed.scheduleAttempt).toBeUndefined();
+  });
+});
+
 describe('scheduling words inside a message are left alone', () => {
   it('does not read a date out of the message', () => {
     const parsed = parse('שלח הודעה לדניאל שהפגישה מחר נדחית');

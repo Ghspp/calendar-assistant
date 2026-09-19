@@ -482,7 +482,23 @@ select and never the whole address book.
 
 The parser treats a message as text, not as slots: `תשלח לאמא שהפגישה מחר נדחית` keeps `מחר` in
 the message instead of reading it as a date. It does this by not running the scheduling matchers
-at all on a send request, which is also why scheduling a message for later is not supported.
+at all on a send request.
+
+**Correcting a mishearing.** At any confirmation you can reject and fix in one breath —
+`לא, לאברהם` changes the recipient, `לא, שאני בדרך` changes the text — and the corrected version
+is read back for confirmation like any other. A bare `לא` still just cancels. Corrections are
+only read at confirmations, never while the assistant is asking `מה לכתוב?`, where every word is
+message text.
+
+**Misheard names.** Speech recognition mangles names constantly. A name split in two (`דני אל`)
+is rejoined and matched exactly; a name that is merely close (`דניאלה` for `דניאל`) is matched by
+edit distance, on a deliberately tight budget: two edits apart is the distance between `יוסי` and
+`רותי`, who are different people. Two contacts equally close are both listed rather than one
+being picked.
+
+**Sending later is not supported**, and the reason is structural: a PWA cannot run in the
+background, so nothing exists to send the message at the appointed time — the same wall that put
+reminders on Google Calendar. Asking for it says so plainly instead of dropping the request.
 
 ### Notifications
 

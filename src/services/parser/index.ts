@@ -15,8 +15,24 @@ import { findRecurrence } from './recurrence';
 import { findDuration } from './durationParser';
 import { findMessageBody, findRecipient } from './messageParser';
 import { findTimes, questionFor, type TimeExpression } from './timeParser';
-import { matchPhrase, normalizeText, tokenize, type Token } from './normalize';
-import { FIRST_FREE_PHRASES } from './lexicon';
+import {
+  hasAnyStem,
+  matchForm,
+  matchPhrase,
+  normalizeText,
+  tokenAt,
+  tokenize,
+  type Token,
+} from './normalize';
+import {
+  DAY_PARTS,
+  DAY_PART_DAYS,
+  FIRST_FREE_PHRASES,
+  MAIL_WORDS,
+  MESSAGE_NOUNS,
+  RECIPIENT_SKIP,
+  WHATSAPP_WORDS,
+} from './lexicon';
 import { extractTitle } from './titleExtractor';
 import type { Clock } from '../../utils/clock';
 import type { Ambiguity, Intent, ParsedCommand, SlotName } from '../../types/parser';
@@ -158,6 +174,7 @@ function buildSendMessage(
   normalizedText: string,
   tokens: Token[],
   intentMatch: IntentMatch | undefined,
+  clock: Clock,
 ): ParsedCommand {
   const verbEnd = intentMatch === undefined ? 0 : Math.max(...intentMatch.tokens) + 1;
 
@@ -165,18 +182,33 @@ function buildSendMessage(
   const bodyFrom = recipient === undefined ? verbEnd : Math.max(...recipient.tokens) + 1;
   const body = findMessageBody(tokens, normalizedText, bodyFrom);
 
+  // Everything the user said between the recipient and the start of the message. It used
+  // to be dropped on the floor: 'תשלח לאמא מחר בבוקר שאני מאחר' lost 'מחר בבוקר' entirely,
+  // and the message went out with no hint that a timing instruction had been ignored.
+  const bodyStart = body === undefined ? tokens.length : Math.min(...body.tokens);
+  const gap = readGap(tokens, bodyFrom, bodyStart, clock);
+
+  // A stray word beside the name is usually the name: 'לדני אל' is one misheard 'לדניאל',
+  // and 'לאמא של דניאל' is one person. Resolution against the contact book decides.
+  const name =
+    recipient === undefined
+      ? undefined
+      : [recipient.name, ...gap.nameWords].join(' ').trim();
+
   const missing: SlotName[] = [];
-  if (recipient === undefined) missing.push('recipient');
+  if (name === undefined) missing.push('recipient');
   if (body === undefined) missing.push('messageBody');
 
   let confidence = 0.35;
-  if (recipient !== undefined) confidence += 0.3;
+  if (name !== undefined) confidence += 0.3;
   if (body !== undefined) confidence += 0.3;
 
   return {
     intent: 'SEND_MESSAGE',
-    ...(recipient !== undefined ? { recipient: recipient.name } : {}),
+    ...(name !== undefined ? { recipient: name } : {}),
     ...(body !== undefined ? { messageBody: body.text } : {}),
+    ...(gap.channel !== undefined ? { channel: gap.channel } : {}),
+    ...(gap.scheduleAttempt ? { scheduleAttempt: true as const } : {}),
     missing,
     // Free text has nothing to disambiguate — there is no second reading of a sentence.
     ambiguities: [],
@@ -184,6 +216,93 @@ function buildSendMessage(
     rawText,
     normalizedText,
   };
+}
+
+interface GapReading {
+  channel?: 'gmail' | 'whatsapp';
+  /** The user asked for it to go out later — which this app cannot do. */
+  scheduleAttempt: boolean;
+  /** Words that belong to the recipient's name. */
+  nameWords: string[];
+}
+
+/**
+ * Account for every token between the recipient and the message.
+ *
+ * Consumed in a fixed order, the same tactic the main pipeline uses: a named channel
+ * first, then anything that looks like a time, and whatever survives is part of the name.
+ * Nothing is allowed to fall through unclaimed — silently discarding what someone said is
+ * the one outcome this function exists to prevent.
+ */
+function readGap(
+  tokens: Token[],
+  from: number,
+  toExclusive: number,
+  clock: Clock,
+): GapReading {
+  const reading: GapReading = { scheduleAttempt: false, nameWords: [] };
+  if (from >= toExclusive) return reading;
+
+  const claimed = new Set<number>();
+
+  // Everything outside the gap is off limits, so the date and time matchers below read
+  // only these tokens rather than rediscovering the whole utterance.
+  const outside = new Set<number>();
+  for (let index = 0; index < tokens.length; index += 1) {
+    if (index < from || index >= toExclusive) outside.add(index);
+  }
+
+  for (let index = from; index < toExclusive; index += 1) {
+    const token = tokenAt(tokens, index);
+    if (token === undefined) continue;
+
+    if (hasAnyStem(token, MAIL_WORDS) !== undefined) {
+      reading.channel = 'gmail';
+      claimed.add(index);
+      continue;
+    }
+    if (hasAnyStem(token, WHATSAPP_WORDS) !== undefined) {
+      reading.channel = 'whatsapp';
+      claimed.add(index);
+      continue;
+    }
+    // A bare day-part carries no hour, so neither findDate nor findTimes below will
+    // claim it — but 'בבוקר' is plainly about when, not about who.
+    if (
+      matchForm(token, DAY_PARTS) !== undefined ||
+      DAY_PART_DAYS.has(token.raw)
+    ) {
+      reading.scheduleAttempt = true;
+      claimed.add(index);
+      continue;
+    }
+
+    // 'הודעה' names the thing being sent, not the person.
+    if (hasAnyStem(token, MESSAGE_NOUNS) !== undefined) claimed.add(index);
+  }
+
+  const dateMatch = findDate(tokens, outside, clock);
+  dateMatch?.tokens.forEach((index) => {
+    reading.scheduleAttempt = true;
+    claimed.add(index);
+  });
+
+  findTimes(tokens, new Set([...outside, ...claimed])).forEach((expression) => {
+    expression.tokens.forEach((index) => {
+      reading.scheduleAttempt = true;
+      claimed.add(index);
+    });
+  });
+
+  for (let index = from; index < toExclusive; index += 1) {
+    if (claimed.has(index)) continue;
+    const token = tokenAt(tokens, index);
+    if (token === undefined) continue;
+    if (RECIPIENT_SKIP.has(token.raw)) continue;
+    reading.nameWords.push(token.raw);
+  }
+
+  return reading;
 }
 
 export function parseCommand(rawText: string, clock: Clock): ParsedCommand {
@@ -209,7 +328,7 @@ export function parseCommand(rawText: string, clock: Clock): ParsedCommand {
   // time lands in the body. Supporting them later means gating the block below on the
   // intent instead of returning, and bounding findDate to the left of the body.
   if (intent === 'SEND_MESSAGE') {
-    return buildSendMessage(rawText, normalizedText, tokens, intentMatch);
+    return buildSendMessage(rawText, normalizedText, tokens, intentMatch, clock);
   }
 
   // Before the date: 'כל' is consumed here, while 'יום שני' is deliberately left so

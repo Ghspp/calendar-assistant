@@ -73,6 +73,43 @@ describe('findContactsByName', () => {
   });
 });
 
+describe('recovering a misheard name', () => {
+  const book: Contact[] = [
+    { id: '1', name: 'דניאל', email: 'd@example.com' },
+    { id: '2', name: 'רותי', email: 'r@example.com' },
+    { id: '3', name: 'אמא', email: 'm@example.com' },
+  ];
+
+  it('rejoins a name the recogniser split in two', () => {
+    expect(findContactsByName(book, 'דני אל').map((c) => c.id)).toEqual(['1']);
+  });
+
+  it('forgives a trailing syllable', () => {
+    expect(findContactsByName(book, 'דניאלה').map((c) => c.id)).toEqual(['1']);
+  });
+
+  it('still finds nothing for a genuinely different name', () => {
+    // Two edits from רותי, and a different person. This is the case that fixes the
+    // threshold: anything looser merges real contacts.
+    expect(findContactsByName(book, 'יוסי')).toEqual([]);
+  });
+
+  it('prefers an exact match over a near one', () => {
+    const withBoth: Contact[] = [...book, { id: '4', name: 'דניאלה', email: 'x@e.com' }];
+    expect(findContactsByName(withBoth, 'דניאלה').map((c) => c.id)).toEqual(['4']);
+  });
+
+  it('returns every equally-near name, so the caller asks instead of picking', () => {
+    const twins: Contact[] = [
+      { id: 'a', name: 'רוני', email: 'a@e.com' },
+      { id: 'b', name: 'רונן', email: 'b@e.com' },
+    ];
+    // 'רונה' is one edit from both. A near match is less certain than an exact one, so
+    // it must not be resolved by choosing.
+    expect(findContactsByName(twins, 'רונה').length).toBe(2);
+  });
+});
+
 describe('channelsFor', () => {
   it('reports BOTH when the contact has both, so the caller can ask', () => {
     // Returning one here would bury a choice the user should be making.

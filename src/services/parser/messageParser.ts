@@ -97,7 +97,9 @@ export function findRecipient(tokens: Token[], searchFrom: number): RecipientMat
     if (complementizerForm(token) !== undefined) return undefined;
 
     const lamed = token.forms.find((form) => form.prefix === 'ל');
-    if (lamed === undefined || lamed.stem.length === 0) continue;
+    // A single letter left after stripping ל is the particle, not a person: 'לא' is
+    // 'no', not 'to A'. Nobody in a contact book has a one-letter name.
+    if (lamed === undefined || lamed.stem.length < 2) continue;
     if (RECIPIENT_BLOCKLIST.has(lamed.stem)) continue;
 
     return { name: lamed.stem, tokens: [index] };

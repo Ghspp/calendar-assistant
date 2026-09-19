@@ -9,6 +9,7 @@
  * outstanding, where the ordinal reading is the only sensible one.
  */
 
+import { MAIL_WORDS, TITLE_FILLERS, WHATSAPP_WORDS } from '../parser/lexicon';
 import { normalizeText, tokenize } from '../parser/normalize';
 import { instantToZonedTime } from '../../utils/time';
 import type { TimedCalendarEvent } from '../../types/calendar';
@@ -42,28 +43,6 @@ const SERIES_WORDS = new Set(['הסדרה', 'סדרה', 'הכל', 'הכול', '�
 /** Which way to send a message, when the contact can be reached both ways. */
 export type ChannelChoice = 'gmail' | 'whatsapp' | 'unclear';
 
-const MAIL_WORDS = new Set(['מייל', 'אימייל', 'מיל', 'דואר', 'איימייל', 'mail', 'email', 'gmail']);
-
-/**
- * WhatsApp, spelled every way Hebrew speech recognition renders it.
- *
- * The transcriber is inconsistent about the צ/ט and about how many vavs it uses, and
- * a spelling that is missing here reads as 'unclear' and makes the assistant ask
- * again — so the list is deliberately generous.
- */
-const WHATSAPP_WORDS = new Set([
-  'וואטסאפ',
-  'ווטסאפ',
-  'וואצאפ',
-  'ווצאפ',
-  'ואטסאפ',
-  'ואצאפ',
-  'וואטסאף',
-  'וואטס',
-  'ווטס',
-  'whatsapp',
-  'wa',
-]);
 
 /**
  * Read an answer to 'this occurrence, or the whole series?'.
@@ -107,6 +86,78 @@ export function readChannelChoice(text: string): ChannelChoice {
   if (saysMail && !saysWhatsApp) return 'gmail';
   if (saysWhatsApp && !saysMail) return 'whatsapp';
   return 'unclear';
+}
+
+/**
+ * A 'no' that also says what the right answer was.
+ *
+ * 'לא, לאברהם' and 'לא, שאני מאחר' are one turn doing two jobs: rejecting what was read
+ * back, and supplying the correction. Today `readConfirmation` stops at the first NO
+ * token and the rest of the sentence is never looked at, so the whole request is thrown
+ * away and the user starts over.
+ *
+ * Returns the substantive remainder after the negation, or undefined when there is
+ * nothing after it — a bare 'לא' keeps its ordinary meaning everywhere.
+ *
+ * This is deliberately only consulted at CONFIRMATION steps, where the expected answer
+ * is yes or no. It is never consulted while the assistant is asking 'מה לכתוב?', where
+ * every word is message text and 'לא, שאני מאחר' is a message someone might mean to send.
+ */
+export function readCorrection(text: string): string | undefined {
+  const normalized = normalizeText(text);
+  const tokens = tokenize(normalized);
+
+  const first = tokens[0];
+  if (first === undefined) return undefined;
+
+  // The negation has to lead. 'תגיד לו שלא באתי' is not a correction.
+  const negated = first.forms.some((form) => NO_WORDS.has(form.stem));
+  if (!negated) return undefined;
+
+  const rest = tokens.slice(1);
+  if (rest.length === 0) return undefined;
+
+  // 'לא רוצה' and 'לא, לא רוצה' are refusals elaborated, not corrections. A correction
+  // has to carry something that could actually BE the replacement, so the remainder
+  // needs at least one word that is neither another refusal nor a filler.
+  const substantive = rest.some(
+    (token) =>
+      !TITLE_FILLERS.has(token.raw) &&
+      !token.forms.some((form) => NO_WORDS.has(form.stem)),
+  );
+  if (!substantive) return undefined;
+
+  const start = rest[0];
+  const last = rest[rest.length - 1];
+  if (start === undefined || last === undefined) return undefined;
+
+  return normalized.slice(start.start, last.end).trim();
+}
+
+/**
+ * Read 'הראשון' or '2' as a position in a list the assistant just read out.
+ *
+ * Returns a zero-based index, or undefined when the answer does not name a position —
+ * the caller then tries to read it as something else rather than guessing.
+ */
+export function readOrdinal(text: string, count: number): number | undefined {
+  if (count === 0) return undefined;
+
+  const normalized = normalizeText(text);
+
+  for (const token of tokenize(normalized)) {
+    for (const form of token.forms) {
+      const ordinal = ORDINALS.get(form.stem);
+      if (ordinal !== undefined && ordinal <= count) return ordinal - 1;
+
+      if (/^\d+$/.test(form.stem)) {
+        const index = Number.parseInt(form.stem, 10);
+        if (index >= 1 && index <= count) return index - 1;
+      }
+    }
+  }
+
+  return undefined;
 }
 
 /** Read a yes/no answer. Anything unrecognised is 'unclear', never a silent yes. */

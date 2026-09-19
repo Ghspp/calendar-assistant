@@ -213,6 +213,44 @@ export const CLAUSE_OPENERS = new Set([
 export const RECIPIENT_SKIP = new Set(['לי', 'בבקשה', 'נא', 'את', 'מהר', 'תכף', 'עכשיו']);
 
 /**
+ * Naming a channel to send on.
+ *
+ * Used in two places that must agree: the parser, when the channel is stated inside the
+ * request ('תשלח לדניאל בוואטסאפ ש…'), and the conversation layer, when it is the answer
+ * to 'במייל או בוואטסאפ?'. One source of truth, or the two would drift.
+ */
+export const MAIL_WORDS = new Set([
+  'מייל',
+  'אימייל',
+  'מיל',
+  'דואר',
+  'איימייל',
+  'mail',
+  'email',
+  'gmail',
+]);
+
+/**
+ * WhatsApp, spelled every way Hebrew speech recognition renders it.
+ *
+ * The transcriber is inconsistent about the צ/ט and about how many vavs it uses, and a
+ * spelling missing here means the word is not recognised — so the list is generous.
+ */
+export const WHATSAPP_WORDS = new Set([
+  'וואטסאפ',
+  'ווטסאפ',
+  'וואצאפ',
+  'ווצאפ',
+  'ואטסאפ',
+  'ואצאפ',
+  'וואטסאף',
+  'וואטס',
+  'ווטס',
+  'whatsapp',
+  'wa',
+]);
+
+/**
  * Hour numerals, masculine and feminine. Used for both times and duration counts.
  * Two-word numerals (11, 12) live in NUMBER_WORD_PAIRS.
  */

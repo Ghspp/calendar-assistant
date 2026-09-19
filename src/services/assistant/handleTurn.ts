@@ -21,11 +21,18 @@ import { applyChangeToEvent } from './updates';
 import { parseUpdate } from './updateParsing';
 import { parseCommand } from '../parser';
 import { confirmDelete } from './deletes';
-import { confirmMessage, startMessage } from './messages';
+import {
+  confirmMessage,
+  readMessageCorrection,
+  startMessage,
+  type MessagingOptions,
+} from './messages';
 import {
   readChannelChoice,
   readChoice,
   readConfirmation,
+  readCorrection,
+  readOrdinal,
   readSeriesScope,
 } from '../conversation/choices';
 import { CalendarError } from '../calendar/errors';
@@ -151,6 +158,15 @@ function pendingActionFor(
       };
     }
     return undefined;
+  }
+
+  if (outcome.kind === 'message-contact-ambiguous') {
+    return {
+      kind: 'choose-contact',
+      matches: outcome.matches,
+      body: outcome.body,
+      updatedAtMs,
+    };
   }
 
   if (outcome.kind === 'message-choose-channel') {
@@ -363,7 +379,52 @@ async function resolvePendingAction(
     }
   }
 
+  if (action.kind === 'choose-contact') {
+    if (readConfirmation(text) === 'no') {
+      return {
+        outcome: { kind: 'abandoned', message: 'בסדר, לא שלחתי כלום.' },
+        state: clearPending(),
+      };
+    }
+
+    const messaging = options.messaging;
+    if (messaging === undefined) {
+      return {
+        outcome: { kind: 'message-unclear', reason: 'not-available' },
+        state: clearPending(),
+      };
+    }
+
+    // 'הראשון' picks from the list that was read out; anything else is taken as the
+    // fuller name and re-matched, which is what makes 'דני כהן' work.
+    const position = readOrdinal(text, action.matches.length);
+    const picked = position === undefined ? undefined : action.matches[position];
+
+    return retryMessage(
+      picked?.name ?? text.trim(),
+      action.body,
+      text,
+      messaging,
+      clock,
+    );
+  }
+
   if (action.kind === 'confirm-message') {
+    // Before the plain no: 'לא, לאברהם' rejects AND supplies the fix, and everything
+    // needed to rebuild is sitting in `action`. Treating it as a bare refusal throws
+    // away a message the user already dictated.
+    const correction = readCorrection(text);
+    if (correction !== undefined && options.messaging !== undefined) {
+      const fix = readMessageCorrection(correction, options.messaging.contacts, clock);
+      return retryMessage(
+        fix.recipient ?? action.contact.name,
+        fix.body ?? action.body,
+        text,
+        options.messaging,
+        clock,
+      );
+    }
+
     const answer = readConfirmation(text);
 
     if (answer === 'no') {
@@ -588,9 +649,26 @@ async function composeMessage(
     };
   }
 
-  // Rebuild a command and run the ordinary path, so contact matching, the channel
-  // question and the confirmation all behave exactly as they do for a one-shot
-  // request. There is no second, looser route to sending.
+  // Run the ordinary path, so contact matching, the channel question and the
+  // confirmation all behave exactly as they do for a one-shot request. There is no
+  // second, looser route to sending.
+  return retryMessage(recipient, body, text, messaging, clock);
+}
+
+/**
+ * Re-run a send with a corrected recipient or body.
+ *
+ * Goes through `startMessage` like any other request, so the corrected version is
+ * contact-matched, channel-checked and read back for confirmation by exactly the same
+ * rules. A correction never sends anything by itself.
+ */
+function retryMessage(
+  recipient: string,
+  body: string,
+  rawText: string,
+  messaging: MessagingOptions,
+  clock: Clock,
+): TurnResult {
   const retry: ParsedCommand = {
     intent: 'SEND_MESSAGE',
     recipient,
@@ -598,8 +676,8 @@ async function composeMessage(
     missing: [],
     ambiguities: [],
     confidence: 1,
-    rawText: text,
-    normalizedText: text,
+    rawText,
+    normalizedText: rawText,
   };
 
   const outcome = startMessage(retry, messaging);

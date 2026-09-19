@@ -222,6 +222,29 @@ describe('choosing the recipient', () => {
     expect(replies[0]).toContain('לא מצאתי איש קשר');
   });
 
+  it('accepts a fuller name as the answer to the ambiguity question', async () => {
+    const twins = stub([
+      { id: 'a', name: 'דני כהן', email: 'a@example.com' },
+      { id: 'b', name: 'דני לוי', email: 'b@example.com' },
+    ]);
+    const { replies, sendMail } = await converse(
+      ['תשלח לדני שאני מאחר', 'דני כהן', 'כן'],
+      twins,
+    );
+
+    expect(replies[1]).toBe('לשלוח במייל לדני כהן: "אני מאחר"?');
+    expect(sendMail).toHaveBeenCalledWith('a@example.com', 'אני מאחר');
+  });
+
+  it('accepts a position as the answer', async () => {
+    const twins = stub([
+      { id: 'a', name: 'דני כהן', email: 'a@example.com' },
+      { id: 'b', name: 'דני לוי', email: 'b@example.com' },
+    ]);
+    const { replies } = await converse(['תשלח לדני שאני מאחר', 'השני'], twins);
+    expect(replies[1]).toBe('לשלוח במייל לדני לוי: "אני מאחר"?');
+  });
+
   it('SENDS NOTHING when the name is ambiguous, and lists them', async () => {
     const twins = stub([
       { id: 'a', name: 'דני כהן', email: 'a@example.com' },
@@ -317,6 +340,132 @@ describe('a contact reachable both ways', () => {
 
     expect(respond(result.outcome, CLOCK)).toContain('בוואטסאפ');
     expect(respond(result.outcome, CLOCK)).not.toContain('במייל או');
+  });
+});
+
+describe('correcting a mishearing instead of starting over', () => {
+  const BOOK = [MUM, DANIEL, { id: 'c5', name: 'אברהם', email: 'avraham@example.com' }];
+
+  it('sends to the corrected person, keeping the message', async () => {
+    const setup = stub(BOOK);
+    const { replies, sendMail } = await converse(
+      ['תשלח לאמא שאני מאחר', 'לא, לאברהם', 'כן'],
+      setup,
+    );
+
+    expect(replies[0]).toBe('לשלוח במייל לאמא: "אני מאחר"?');
+    expect(replies[1]).toBe('לשלוח במייל לאברהם: "אני מאחר"?');
+    expect(sendMail).toHaveBeenCalledOnce();
+    expect(sendMail).toHaveBeenCalledWith('avraham@example.com', 'אני מאחר');
+  });
+
+  it('replaces the message, keeping the person', async () => {
+    const setup = stub(BOOK);
+    const { replies, sendMail } = await converse(
+      ['תשלח לאמא שאני מאחר', 'לא, שאני בדרך', 'כן'],
+      setup,
+    );
+
+    expect(replies[1]).toBe('לשלוח במייל לאמא: "אני בדרך"?');
+    expect(sendMail).toHaveBeenCalledWith('mum@example.com', 'אני בדרך');
+  });
+
+  it('reads a bare name as the person when someone is called that', async () => {
+    const setup = stub(BOOK);
+    const { replies } = await converse(['תשלח לאמא שאני מאחר', 'לא, אברהם'], setup);
+    expect(replies[1]).toBe('לשלוח במייל לאברהם: "אני מאחר"?');
+  });
+
+  it('reads a bare phrase as the message when nobody is called that', async () => {
+    const setup = stub(BOOK);
+    const { replies } = await converse(['תשלח לאמא שאני מאחר', 'לא, תודה רבה'], setup);
+    expect(replies[1]).toBe('לשלוח במייל לאמא: "תודה רבה"?');
+  });
+
+  it('SENDS NOTHING from the correction itself — it only re-asks', async () => {
+    const setup = stub(BOOK);
+    const { sendMail } = await converse(['תשלח לאמא שאני מאחר', 'לא, לאברהם'], setup);
+    expect(sendMail).not.toHaveBeenCalled();
+  });
+
+  it.each(['לא', 'לא רוצה', 'לא, לא רוצה'])(
+    'keeps %s a plain refusal',
+    async (answer) => {
+      const setup = stub(BOOK);
+      const { replies, sendMail } = await converse(
+        ['תשלח לאמא שאני מאחר', answer],
+        setup,
+      );
+
+      expect(sendMail).not.toHaveBeenCalled();
+      expect(replies[1]).toBe('בסדר, לא שלחתי כלום.');
+    },
+  );
+
+  it('reports an unknown corrected name rather than sending to the old one', async () => {
+    const setup = stub(BOOK);
+    const { replies, sendMail } = await converse(
+      ['תשלח לאמא שאני מאחר', 'לא, ליוסי'],
+      setup,
+    );
+
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(replies[1]).toContain('לא מצאתי איש קשר');
+  });
+});
+
+describe('a channel named in the request', () => {
+  const BOTH: Contact = {
+    id: 'c9',
+    name: 'יעל',
+    email: 'yael@example.com',
+    phone: '972521111111',
+  };
+
+  it('skips the channel question', async () => {
+    const { replies, sendMail } = await converse(
+      ['תשלח ליעל בוואטסאפ שאני בדרך'],
+      stub([BOTH]),
+    );
+
+    expect(replies[0]).toBe('לשלוח בוואטסאפ ליעל: "אני בדרך"?');
+    expect(replies[0]).not.toContain('במייל או');
+    expect(sendMail).not.toHaveBeenCalled();
+  });
+
+  it('honours mail just as readily', async () => {
+    const { replies } = await converse(['תשלח ליעל במייל שאני בדרך'], stub([BOTH]));
+    expect(replies[0]).toBe('לשלוח במייל ליעל: "אני בדרך"?');
+  });
+
+  it('says so when the contact cannot be reached that way', async () => {
+    // MUM has an email and no phone.
+    const { replies, sendMail } = await converse(
+      ['תשלח לאמא בוואטסאפ שאני מאחר'],
+      stub([MUM]),
+    );
+
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(replies[0]).toContain('אין וואטסאפ שמור');
+  });
+});
+
+describe('asking to send later', () => {
+  it('says plainly that it cannot schedule, instead of ignoring it', async () => {
+    const { replies, sendMail } = await converse(
+      ['תשלח לאמא מחר בבוקר שאני מאחר'],
+      stub([MUM]),
+    );
+
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(replies[0]).toContain('לא יכולה לתזמן');
+    // The message itself is still offered, so the request is not simply lost.
+    expect(replies[0]).toContain('אני מאחר');
+  });
+
+  it('says nothing about scheduling when none was asked for', async () => {
+    const { replies } = await converse(['תשלח לאמא שאני מאחר'], stub([MUM]));
+    expect(replies[0]).not.toContain('לתזמן');
   });
 });
 

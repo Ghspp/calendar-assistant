@@ -96,6 +96,14 @@ function describeConflict(conflict: Conflict, timeZone: string): string {
   return `${conflict.event.title} ${describeTimeRange(start, end)}`;
 }
 
+/**
+ * Said whenever the user asked for a message to go out later.
+ *
+ * The app genuinely cannot do it — nothing runs when it is closed — so this states the
+ * limit and offers the thing it CAN do, rather than ignoring half the request.
+ */
+const CANNOT_SCHEDULE = 'אני לא יכולה לתזמן הודעות למועד מאוחר יותר.';
+
 const UNSUPPORTED_BY_INTENT: Record<string, string> = {
   UNKNOWN: 'לא הבנתי את הבקשה. נסה למשל: "תקבע לי פגישה עם דניאל מחר בשש בערב לשעה".',
 };
@@ -456,13 +464,22 @@ export function respond(outcome: CommandOutcome, clock: Clock): string {
         outcome.channel === 'gmail'
           ? `במייל ל${outcome.contact.name}`
           : `בוואטסאפ ל${outcome.contact.name}`;
-      return `לשלוח ${how}: "${outcome.body}"?`;
+      const question = `לשלוח ${how}: "${outcome.body}"?`;
+      return outcome.cannotSchedule === true ? `${CANNOT_SCHEDULE} ${question}` : question;
     }
 
-    case 'message-choose-channel':
+    case 'message-channel-unavailable': {
+      const named = outcome.channel === 'gmail' ? 'מייל' : 'וואטסאפ';
+      const other = outcome.channel === 'gmail' ? 'טלפון' : 'כתובת מייל';
+      return `ל${outcome.contact.name} אין ${named} שמור, רק ${other}. לא שלחתי.`;
+    }
+
+    case 'message-choose-channel': {
       // The message is quoted in full here, so naming a channel is a real, informed
       // confirmation — there is no second question to ask afterwards.
-      return `לשלוח ל${outcome.contact.name}: "${outcome.body}" — במייל או בוואטסאפ?`;
+      const question = `לשלוח ל${outcome.contact.name}: "${outcome.body}" — במייל או בוואטסאפ?`;
+      return outcome.cannotSchedule === true ? `${CANNOT_SCHEDULE} ${question}` : question;
+    }
 
     case 'message-sent':
       return `שלחתי ל${outcome.contact.name}.`;

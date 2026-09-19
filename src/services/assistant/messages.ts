@@ -17,7 +17,9 @@
  */
 
 import type { ParsedCommand } from '../../types/parser';
+import type { Clock } from '../../utils/clock';
 import type { Contact } from '../../storage/contacts';
+import { parseCommand } from '../parser';
 import type { GmailChannel } from '../messaging/GmailChannel';
 import { channelsFor, findContactsByName } from '../messaging/contactMatching';
 import { buildWhatsAppUrl } from '../messaging/whatsappLink';
@@ -64,6 +66,11 @@ export function startMessage(
     return { kind: 'message-unclear', reason: 'no-body', recipient: name };
   }
 
+  // Asked for it to go out later. The app cannot do that — a PWA does not run in the
+  // background, so nothing exists to send it at the appointed time — and the honest
+  // answer is to carry the refusal into the confirmation rather than ignore it.
+  const scheduleNote = parsed.scheduleAttempt === true ? { cannotSchedule: true as const } : {};
+
   const matches = findContactsByName(options.contacts, name);
 
   if (matches.length === 0) {
@@ -71,7 +78,7 @@ export function startMessage(
   }
 
   if (matches.length > 1) {
-    return { kind: 'message-contact-ambiguous', name, matches };
+    return { kind: 'message-contact-ambiguous', name, matches, body };
   }
 
   const contact = matches[0];
@@ -91,14 +98,59 @@ export function startMessage(
       : { kind: 'message-no-channel', contact };
   }
 
+  // A channel named in the request settles the question — but only if the contact can
+  // actually be reached that way. Saying so beats quietly using the other one.
+  const asked = parsed.channel;
+  if (asked !== undefined && !channels.includes(asked)) {
+    return { kind: 'message-channel-unavailable', contact, channel: asked };
+  }
+
+  if (asked !== undefined) {
+    return { kind: 'message-confirm', contact, body, channel: asked, ...scheduleNote };
+  }
+
   if (channels.length > 1) {
-    return { kind: 'message-choose-channel', contact, body, channels };
+    return { kind: 'message-choose-channel', contact, body, channels, ...scheduleNote };
   }
 
   const channel = channels[0];
   if (channel === undefined) return { kind: 'message-no-channel', contact };
 
-  return { kind: 'message-confirm', contact, body, channel };
+  return { kind: 'message-confirm', contact, body, channel, ...scheduleNote };
+}
+
+export interface MessageCorrection {
+  recipient?: string;
+  body?: string;
+}
+
+/**
+ * Read what a 'לא, …' was correcting.
+ *
+ * Rather than inventing a second grammar, the remainder is fed back through the parser
+ * as if it were a send request — so `לאברהם` yields a recipient and `שאני מאחר` yields a
+ * body by exactly the rules that produced the reading being corrected. The `הודעה` in
+ * the synthetic text is what guarantees the send verb takes an object and parses.
+ *
+ * A bare word with no ל and no ש is the genuinely ambiguous case, and the contact book
+ * settles it: `לא, אברהם` is a recipient if someone is called that, and otherwise it is
+ * the new message. Either way the result is read back for confirmation before anything
+ * is sent, so a wrong guess costs one turn and nothing else.
+ */
+export function readMessageCorrection(
+  text: string,
+  contacts: readonly Contact[],
+  clock: Clock,
+): MessageCorrection {
+  const parsed = parseCommand(`תשלח הודעה ${text}`, clock);
+
+  const recipient = parsed.recipient?.trim();
+  if (recipient !== undefined && recipient.length > 0) return { recipient };
+
+  const body = parsed.messageBody?.trim();
+  if (body === undefined || body.length === 0) return {};
+
+  return findContactsByName(contacts, body).length > 0 ? { recipient: body } : { body };
 }
 
 /**

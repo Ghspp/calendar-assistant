@@ -97,6 +97,19 @@ export type PendingAction =
       updatedAtMs: number;
     }
   /**
+   * Several contacts share the name that was said, and the assistant listed them.
+   * NOTHING has been sent.
+   *
+   * The message is held here so answering with a name or a position finishes the
+   * request, rather than the answer arriving as a brand-new command.
+   */
+  | {
+      kind: 'choose-contact';
+      matches: Contact[];
+      body: string;
+      updatedAtMs: number;
+    }
+  /**
    * A message is composed, but the contact can be reached two ways and which one has
    * not been said. NOTHING has been sent.
    *

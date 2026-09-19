@@ -93,6 +93,20 @@ export interface ParsedCommand {
    * 'שאני מאחר', which is a marker rather than part of the message.
    */
   messageBody?: string;
+  /**
+   * A channel named inside the request itself ('תשלח לדניאל בוואטסאפ ש…').
+   *
+   * When set, the assistant does not ask which way to send — the user already said.
+   */
+  channel?: 'gmail' | 'whatsapp';
+  /**
+   * The user asked for the message to go out later.
+   *
+   * Recorded rather than acted on: a PWA cannot run in the background, so there is
+   * nothing to send it at the appointed time. Knowing they asked is what lets the
+   * assistant say so instead of silently ignoring it.
+   */
+  scheduleAttempt?: true;
   /** Slots with no information at all. Drives 'באיזו שעה לקבוע?' style questions. */
   missing: SlotName[];
   /** Slots that had information the parser refused to resolve. */
