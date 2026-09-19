@@ -141,6 +141,15 @@ export async function applyUpdate(
   const event = matches[0];
   if (event === undefined) return { kind: 'update-not-found', timeZone, target: request.target };
 
+  // Renaming a repeating event is ambiguous in the same way deleting one is: this
+  // occurrence, or every one. Moving is NOT offered for a whole series — shifting a
+  // master's start also moves where the series begins, which is a different and more
+  // surprising change than the user asked for. A move therefore applies to the single
+  // occurrence, and the reply says so.
+  if (event.recurringEventId !== undefined && request.change.kind !== 'move') {
+    return { kind: 'update-scope', timeZone, event, change: request.change };
+  }
+
   return applyChangeToEvent(event, request.change, events, options);
 }
 
@@ -155,9 +164,17 @@ export async function applyChangeToEvent(
   change: UpdateChange,
   events: readonly CalendarEvent[],
   options: UpdateOptions,
+  scope: 'instance' | 'series' = 'instance',
 ): Promise<CommandOutcome> {
   const { clock, provider } = options;
   const timeZone = clock.timeZone();
+
+  // Google treats a series and its occurrences as separate resources; which id is sent
+  // is the entire difference between changing one afternoon and changing all of them.
+  const targetId =
+    scope === 'series' && event.recurringEventId !== undefined
+      ? event.recurringEventId
+      : event.id;
 
   const previousTitle = event.title;
   const previousStart = new Date(event.start);
@@ -188,7 +205,7 @@ export async function applyChangeToEvent(
       return { kind: 'update-conflict', timeZone, event, conflicts: report.conflicts };
     }
 
-    const updated = await provider.updateEvent(event.id, {
+    const updated = await provider.updateEvent(targetId, {
       interval: { start, end },
       timeZone,
     });
@@ -197,6 +214,7 @@ export async function applyChangeToEvent(
       kind: 'updated',
       timeZone,
       updated,
+      scope,
       previousTitle,
       newTitle: previousTitle,
       previousStart: previousStart.toISOString(),
@@ -224,12 +242,13 @@ export async function applyChangeToEvent(
   }
 
   // Rule 3: a rename sends only the title.
-  const updated = await provider.updateEvent(event.id, { title: resolved.title });
+  const updated = await provider.updateEvent(targetId, { title: resolved.title });
 
   return {
     kind: 'updated',
     timeZone,
     updated,
+    scope,
     previousTitle,
     newTitle: resolved.title,
     previousStart: previousStart.toISOString(),

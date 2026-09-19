@@ -275,6 +275,12 @@ function describeUpdate(
   const renamed = outcome.previousTitle !== outcome.newTitle;
   const moved = outcome.previousStart !== outcome.newStart;
 
+  // Saying which scope was applied matters most here: the user asked a question to get
+  // this, and 'שיניתי' alone would not tell them whether next week changed too.
+  if (outcome.scope === 'series') {
+    return `שיניתי את כל הסדרה של ${outcome.previousTitle} ל${outcome.newTitle}.`;
+  }
+
   if (renamed && !moved) {
     return `שיניתי את ${outcome.previousTitle} ל${outcome.newTitle}. נשאר ${when}.`;
   }
@@ -385,6 +391,14 @@ export function respond(outcome: CommandOutcome, clock: Clock): string {
       return `מצאתי ${outcome.matches.length} אירועים בשם הזה: ${listed} על איזה מהם?`;
     }
 
+    case 'update-scope':
+      // Spelled out like the delete question, for the same reason: 'לשנות?' would hide
+      // the fact that there are two different answers.
+      return (
+        `${describeEventWithDate(outcome.event, outcome.timeZone, clock)} הוא אירוע חוזר. ` +
+        `לשנות רק את המופע הזה, או את כל הסדרה?`
+      );
+
     case 'update-not-found':
       return `לא מצאתי אירוע בשם ${outcome.target}.`;
 
@@ -406,8 +420,18 @@ export function respond(outcome: CommandOutcome, clock: Clock): string {
       // Describe it fully. This sentence is the user's last chance to spot a wrong match.
       return `למחוק את ${describeEventWithDate(outcome.event, outcome.timeZone, clock)}?`;
 
+    case 'delete-scope':
+      // Both options are spelled out. 'למחוק?' alone would leave the user answering a
+      // question they had not realised had two very different meanings.
+      return (
+        `${outcome.event.title} ${describeEventWithDate(outcome.event, outcome.timeZone, clock)} ` +
+        `הוא אירוע חוזר. למחוק רק את המופע הזה, או את כל הסדרה?`
+      );
+
     case 'deleted':
-      return `מחקתי את ${describeEventWithDate(outcome.event, outcome.timeZone, clock)}.`;
+      return outcome.scope === 'series'
+        ? `מחקתי את כל הסדרה של ${outcome.event.title}.`
+        : `מחקתי את ${describeEventWithDate(outcome.event, outcome.timeZone, clock)}.`;
 
     case 'delete-ambiguous': {
       const listed = outcome.matches

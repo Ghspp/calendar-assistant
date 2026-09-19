@@ -17,6 +17,7 @@ import type { FreeSlot } from '../conflict/findFreeSlots';
 import type { CreatedEvent } from '../calendar/CalendarProvider';
 import type { ValidationError } from '../validation/validateEvent';
 import type { CalendarErrorKind } from '../calendar/errors';
+import type { UpdateChange } from './updateParsing';
 
 /**
  * One reading of an availability question.
@@ -100,6 +101,8 @@ export type CommandOutcome =
       kind: 'updated';
       timeZone: string;
       updated: CreatedEvent;
+      /** Whether one occurrence changed, or the whole repeating series. */
+      scope: 'instance' | 'series';
       previousTitle: string;
       newTitle: string;
       previousStart: string;
@@ -113,6 +116,18 @@ export type CommandOutcome =
       timeZone: string;
       target: string;
       matches: TimedCalendarEvent[];
+    }
+  /**
+   * The matched event repeats, and which occurrences to change has not been said.
+   *
+   * NOTHING is changed. Renaming one afternoon and renaming every afternoon are
+   * different enough that the question is asked rather than answered by a default.
+   */
+  | {
+      kind: 'update-scope';
+      timeZone: string;
+      event: TimedCalendarEvent;
+      change: UpdateChange;
     }
   /** No event matched the name. Nothing was changed. */
   | { kind: 'update-not-found'; timeZone: string; target: string }
@@ -131,9 +146,22 @@ export type CommandOutcome =
       word?: string;
     }
   /** An event was deleted. Only reachable after an explicit confirmation. */
-  | { kind: 'deleted'; timeZone: string; event: TimedCalendarEvent }
+  | {
+      kind: 'deleted';
+      timeZone: string;
+      event: TimedCalendarEvent;
+      /** Whether one occurrence went, or the whole repeating series. */
+      scope: 'instance' | 'series';
+    }
   /** One event matched and we are waiting for a yes before removing it. */
   | { kind: 'delete-confirm'; timeZone: string; event: TimedCalendarEvent }
+  /**
+   * The match repeats, and which occurrences to remove has not been said.
+   *
+   * NOTHING is deleted. Both readings are destructive in different ways, so the
+   * question is asked rather than resolved by a default.
+   */
+  | { kind: 'delete-scope'; timeZone: string; event: TimedCalendarEvent }
   /** Several matched. NOTHING was deleted — the user must choose. */
   | {
       kind: 'delete-ambiguous';

@@ -88,15 +88,34 @@ export async function startDelete(
   const event = matches[0];
   if (event === undefined) return { kind: 'delete-not-found', timeZone, target };
 
+  // A repeating event needs a fourth question before the other three mean anything:
+  // deleting 'the football class' could mean tomorrow's, or every one from now on.
+  // Guessing either way is destructive, so it is asked outright — and the answer
+  // doubles as the confirmation, since it says exactly what will go.
+  if (event.recurringEventId !== undefined) {
+    return { kind: 'delete-scope', timeZone, event };
+  }
+
   // Rule 2: describe it and wait.
   return { kind: 'delete-confirm', timeZone, event };
 }
 
-/** Actually delete. Only ever reached after an explicit yes. */
+/**
+ * Actually delete. Only ever reached after an explicit yes.
+ *
+ * `scope` decides which id is sent: the instance's own, or the series it belongs to.
+ * Google treats those as different resources, which is the whole mechanism.
+ */
 export async function confirmDelete(
   event: TimedCalendarEvent,
   options: DeleteOptions,
+  scope: 'instance' | 'series' = 'instance',
 ): Promise<CommandOutcome> {
-  await options.provider.deleteEvent(event.id);
-  return { kind: 'deleted', timeZone: options.clock.timeZone(), event };
+  const targetId =
+    scope === 'series' && event.recurringEventId !== undefined
+      ? event.recurringEventId
+      : event.id;
+
+  await options.provider.deleteEvent(targetId);
+  return { kind: 'deleted', timeZone: options.clock.timeZone(), event, scope };
 }

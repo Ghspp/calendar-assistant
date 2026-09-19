@@ -21,7 +21,7 @@ import { applyChangeToEvent } from './updates';
 import { parseUpdate } from './updateParsing';
 import { parseCommand } from '../parser';
 import { confirmDelete } from './deletes';
-import { readChoice, readConfirmation } from '../conversation/choices';
+import { readChoice, readConfirmation, readSeriesScope } from '../conversation/choices';
 import { CalendarError } from '../calendar/errors';
 import { isActionExpired, type PendingAction } from '../conversation/ConversationManager';
 import {
@@ -128,6 +128,19 @@ function pendingActionFor(
     return { kind: 'confirm-delete', event: outcome.event, updatedAtMs };
   }
 
+  if (outcome.kind === 'delete-scope') {
+    return { kind: 'delete-scope', event: outcome.event, updatedAtMs };
+  }
+
+  if (outcome.kind === 'update-scope') {
+    return {
+      kind: 'update-scope',
+      event: outcome.event,
+      change: outcome.change,
+      updatedAtMs,
+    };
+  }
+
   if (outcome.kind === 'conflict' && outcome.suggestion !== undefined) {
     return {
       kind: 'confirm-suggestion',
@@ -229,6 +242,71 @@ async function resolvePendingAction(
       },
       state: { action: { ...action, updatedAtMs: clock.now().getTime() } },
     };
+  }
+
+  if (action.kind === 'delete-scope') {
+    const scope = readSeriesScope(text);
+
+    if (readConfirmation(text) === 'no') {
+      return {
+        outcome: { kind: 'abandoned', message: 'בסדר, לא מחקתי כלום.' },
+        state: clearPending(),
+      };
+    }
+
+    if (scope === 'unclear') {
+      // Never resolve this by default. One reading removes a single afternoon, the
+      // other removes every one from here on.
+      return {
+        outcome: { kind: 'delete-scope', timeZone, event: action.event },
+        state: { action: { ...action, updatedAtMs: clock.now().getTime() } },
+      };
+    }
+
+    try {
+      const outcome = await confirmDelete(action.event, { provider, clock }, scope);
+      return { outcome, state: clearPending() };
+    } catch (error) {
+      return { outcome: toTurnFailure(error), state: clearPending() };
+    }
+  }
+
+  if (action.kind === 'update-scope') {
+    const scope = readSeriesScope(text);
+
+    if (readConfirmation(text) === 'no') {
+      return {
+        outcome: { kind: 'abandoned', message: 'בסדר, לא שיניתי כלום.' },
+        state: clearPending(),
+      };
+    }
+
+    if (scope === 'unclear') {
+      // Same reasoning as the delete case: renaming one occurrence and renaming every
+      // one are both plausible readings, so neither is assumed.
+      return {
+        outcome: {
+          kind: 'update-scope',
+          timeZone,
+          event: action.event,
+          change: action.change,
+        },
+        state: { action: { ...action, updatedAtMs: clock.now().getTime() } },
+      };
+    }
+
+    try {
+      const outcome = await applyChangeToEvent(
+        action.event,
+        action.change,
+        [],
+        { provider, clock },
+        scope,
+      );
+      return { outcome, state: clearPending() };
+    } catch (error) {
+      return { outcome: toTurnFailure(error), state: clearPending() };
+    }
   }
 
   if (action.kind === 'confirm-delete') {

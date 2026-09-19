@@ -65,6 +65,22 @@ export type PendingAction =
     }
   | { kind: 'confirm-delete'; event: TimedCalendarEvent; updatedAtMs: number }
   /**
+   * A repeating event was matched and the scope is still open: this occurrence, or
+   * the whole series. Nothing has been deleted.
+   */
+  | { kind: 'delete-scope'; event: TimedCalendarEvent; updatedAtMs: number }
+  /**
+   * The same open question for a change rather than a deletion. The change is held
+   * here, unapplied, until the scope is settled. Only non-move changes reach this, so
+   * no surrounding events need to be carried for a conflict re-check.
+   */
+  | {
+      kind: 'update-scope';
+      event: TimedCalendarEvent;
+      change: UpdateChange;
+      updatedAtMs: number;
+    }
+  /**
    * An alternative slot was offered after a conflict. NOTHING has been written; the
    * offer becomes an action only on an explicit yes.
    */

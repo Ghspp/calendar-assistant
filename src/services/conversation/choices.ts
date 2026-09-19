@@ -33,6 +33,35 @@ const NO_WORDS = new Set(['לא', 'עזוב', 'ביטול', 'תשכח', 'אל', 
 
 export type Confirmation = 'yes' | 'no' | 'unclear';
 
+/** Whether an action on a repeating event applies to one occurrence or all of them. */
+export type SeriesScope = 'instance' | 'series' | 'unclear';
+
+const INSTANCE_WORDS = new Set(['זה', 'הזה', 'הפעם', 'המופע', 'אחד', 'היום', 'מחר']);
+const SERIES_WORDS = new Set(['הסדרה', 'סדרה', 'הכל', 'הכול', 'כולם', 'תמיד', 'כולן']);
+
+/**
+ * Read an answer to 'this occurrence, or the whole series?'.
+ *
+ * 'רק' on its own is not enough — it appears in both answers ('רק את זה', 'רק הסדרה'),
+ * so the distinguishing noun has to be present. Anything else is unclear, and the
+ * caller asks again rather than picking the more destructive reading.
+ */
+export function readSeriesScope(text: string): SeriesScope {
+  const tokens = tokenize(normalizeText(text));
+
+  const has = (words: ReadonlySet<string>): boolean =>
+    tokens.some((token) => token.forms.some((form) => words.has(form.stem)));
+
+  // 'כל' only means the series when it is not part of 'כל אחד' or similar; pairing it
+  // with the series nouns keeps it unambiguous.
+  const saysSeries = has(SERIES_WORDS) || tokens.some((token) => token.raw === 'הסדרה');
+  const saysInstance = has(INSTANCE_WORDS);
+
+  if (saysSeries && !saysInstance) return 'series';
+  if (saysInstance && !saysSeries) return 'instance';
+  return 'unclear';
+}
+
 /** Read a yes/no answer. Anything unrecognised is 'unclear', never a silent yes. */
 export function readConfirmation(text: string): Confirmation {
   const tokens = tokenize(normalizeText(text));
