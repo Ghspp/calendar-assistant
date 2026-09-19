@@ -82,6 +82,21 @@ export type PendingAction =
       updatedAtMs: number;
     }
   /**
+   * A message is half-stated: one of the recipient and the text is still missing, and
+   * the assistant has asked for it. NOTHING has been sent.
+   *
+   * This exists because asking a question without recording it is worse than not
+   * asking at all — the answer arrives as a brand-new command and is refused.
+   */
+  | {
+      kind: 'compose-message';
+      recipient?: string;
+      body?: string;
+      /** Which of the two was just asked for, so the answer is read correctly. */
+      asking: 'recipient' | 'body';
+      updatedAtMs: number;
+    }
+  /**
    * A message is composed, but the contact can be reached two ways and which one has
    * not been said. NOTHING has been sent.
    *

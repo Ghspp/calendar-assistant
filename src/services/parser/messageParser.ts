@@ -151,9 +151,17 @@ export function findMessageBody(
     }
   }
 
-  // No marker at all: the message is simply whatever followed the recipient.
-  if (startIndex === undefined && searchFrom < tokens.length) {
-    startIndex = searchFrom;
+  // No marker at all: the message is simply whatever followed the recipient — but
+  // never the word 'הודעה' itself. 'תשלח הודעה' means the user has not said what to
+  // write yet, and reading the noun as the text would send someone the word "message".
+  if (startIndex === undefined) {
+    for (let index = searchFrom; index < tokens.length; index += 1) {
+      const token = tokenAt(tokens, index);
+      if (token === undefined) continue;
+      if (hasAnyStem(token, MESSAGE_NOUNS) !== undefined) continue;
+      startIndex = index;
+      break;
+    }
   }
 
   if (startIndex === undefined) return undefined;

@@ -135,6 +135,15 @@ describe('the message body is verbatim', () => {
     expect(parsed.messageBody).toBeUndefined();
     expect(parsed.missing).toContain('messageBody');
   });
+
+  it.each(['תשלח הודעה', 'תשלח לאמא הודעה', 'שלח מייל'])(
+    'never reads the noun in %s as the message itself',
+    (text) => {
+      // 'תשלח הודעה' means the user has not said what to write yet. Sending them the
+      // word "message" would be absurd, and it is what the fallback used to do.
+      expect(parse(text).messageBody).toBeUndefined();
+    },
+  );
 });
 
 describe('scheduling words inside a message are left alone', () => {

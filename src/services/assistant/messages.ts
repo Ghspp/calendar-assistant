@@ -48,13 +48,20 @@ export function startMessage(
   options: MessagingOptions,
 ): CommandOutcome {
   const name = parsed.recipient?.trim();
+  const body = parsed.messageBody?.trim();
+
+  // Each question carries back what is already known, so the answer completes the
+  // request instead of starting a new one.
   if (name === undefined || name.length === 0) {
-    return { kind: 'message-unclear', reason: 'no-recipient' };
+    return {
+      kind: 'message-unclear',
+      reason: 'no-recipient',
+      ...(body !== undefined && body.length > 0 ? { body } : {}),
+    };
   }
 
-  const body = parsed.messageBody?.trim();
   if (body === undefined || body.length === 0) {
-    return { kind: 'message-unclear', reason: 'no-body' };
+    return { kind: 'message-unclear', reason: 'no-body', recipient: name };
   }
 
   const matches = findContactsByName(options.contacts, name);

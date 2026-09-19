@@ -219,6 +219,13 @@ export type CommandOutcome =
   | {
       kind: 'message-unclear';
       reason: 'no-recipient' | 'no-body' | 'not-available' | 'no-mail-permission';
+      /**
+       * Whatever was already understood, carried so the conversation layer can hold it
+       * while it asks for the rest. Without this the question is a dead end: the
+       * assistant asks 'מה לכתוב?' and has already forgotten who it was writing to.
+       */
+      recipient?: string;
+      body?: string;
     }
   /** The user declined a pending confirmation, or backed out of a choice. */
   | { kind: 'abandoned'; message: string }

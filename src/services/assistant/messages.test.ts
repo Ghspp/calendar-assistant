@@ -104,6 +104,106 @@ describe('nothing is sent without confirmation', () => {
   });
 });
 
+describe('answering the follow-up questions', () => {
+  /*
+   * All three of these were reported from real use. The assistant asked a question
+   * and then refused the answer, because the question was never recorded: the reply
+   * arrived as a brand-new command and parsed as UNKNOWN.
+   */
+
+  it('accepts a recipient given on the next turn', async () => {
+    const self = stub([{ id: 'me', name: 'אני', email: 'me@example.com' }]);
+    const { replies, sendMail } = await converse(
+      ['תשלח הודעה', 'אני', 'שלום'],
+      self,
+    );
+
+    expect(replies[0]).toBe('למי לשלוח?');
+    expect(replies[1]).toBe('מה לכתוב?');
+    expect(replies[2]).toBe('לשלוח במייל לאני: "שלום"?');
+    expect(sendMail).not.toHaveBeenCalled();
+  });
+
+  it('accepts a body given on the next turn', async () => {
+    const dad = stub([{ id: 'd', name: 'אבא', email: 'dad@example.com' }]);
+    const { replies } = await converse(['תשלח הודעה לאבא', 'שלום'], dad);
+
+    expect(replies[0]).toBe('מה לכתוב?');
+    expect(replies[1]).toBe('לשלוח במייל לאבא: "שלום"?');
+  });
+
+  it('takes a body literally even when it reads as a calendar command', async () => {
+    // 'מה קורה' is a registered QUERY phrase. As an answer to 'מה לכתוב?' it is a
+    // message, and answering it as a question listed the user's events instead.
+    const dad = stub([{ id: 'd', name: 'אבא', email: 'dad@example.com' }]);
+    const { replies } = await converse(['תשלח הודעה לאבא', 'מה קורה'], dad);
+
+    expect(replies[1]).toBe('לשלוח במייל לאבא: "מה קורה"?');
+    expect(replies[1]).not.toContain('אירועים');
+  });
+
+  it.each(['תקבע לי פגישה מחר', 'תבטל הכל', 'מה יש לי מחר'])(
+    'sends %s as text rather than obeying it',
+    async (body) => {
+      const dad = stub([{ id: 'd', name: 'אבא', email: 'dad@example.com' }]);
+      const { replies } = await converse(['תשלח הודעה לאבא', body], dad);
+      expect(replies[1]).toBe(`לשלוח במייל לאבא: "${body}"?`);
+    },
+  );
+
+  it('completes the whole thing and sends on a yes', async () => {
+    const dad = stub([{ id: 'd', name: 'אבא', email: 'dad@example.com' }]);
+    const { replies, sendMail } = await converse(
+      ['תשלח הודעה', 'אבא', 'מה קורה', 'כן'],
+      dad,
+    );
+
+    expect(sendMail).toHaveBeenCalledOnce();
+    expect(sendMail).toHaveBeenCalledWith('dad@example.com', 'מה קורה');
+    expect(replies[3]).toBe('שלחתי לאבא.');
+  });
+
+  it('lets a plain no cancel at the recipient question', async () => {
+    // Safe here and NOT for the body: nobody is called 'לא', but 'לא' is a perfectly
+    // good thing to send someone.
+    const dad = stub([{ id: 'd', name: 'אבא', email: 'dad@example.com' }]);
+    const { replies, sendMail } = await converse(['תשלח הודעה', 'לא'], dad);
+
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(replies[1]).toBe('בסדר, לא שלחתי כלום.');
+  });
+
+  it('offers to send a refusal-shaped body rather than silently dropping it', async () => {
+    // There is deliberately no cancel word for the body: the confirmation is the
+    // escape hatch, so no message a user meant can be thrown away.
+    const dad = stub([{ id: 'd', name: 'אבא', email: 'dad@example.com' }]);
+    const { replies, sendMail } = await converse(
+      ['תשלח הודעה לאבא', 'לא עזוב', 'לא'],
+      dad,
+    );
+
+    expect(replies[1]).toBe('לשלוח במייל לאבא: "לא עזוב"?');
+    expect(replies[2]).toBe('בסדר, לא שלחתי כלום.');
+    expect(sendMail).not.toHaveBeenCalled();
+  });
+
+  it('reports an unknown name given as an answer, and sends nothing', async () => {
+    const dad = stub([{ id: 'd', name: 'אבא', email: 'dad@example.com' }]);
+    const { replies, sendMail } = await converse(['תשלח הודעה', 'יוסי', 'שלום'], dad);
+
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(replies[2]).toContain('לא מצאתי איש קשר');
+  });
+
+  it('keeps a body stated up front while asking who it is for', async () => {
+    const dad = stub([{ id: 'd', name: 'אבא', email: 'dad@example.com' }]);
+    const { replies } = await converse(['תשלח הודעה שאני מאחר', 'אבא'], dad);
+
+    expect(replies[0]).toBe('למי לשלוח?');
+    expect(replies[1]).toBe('לשלוח במייל לאבא: "אני מאחר"?');
+  });
+});
+
 describe('choosing the recipient', () => {
   it('finds a contact whose name is an ordinary Hebrew word', async () => {
     // Regression: contact matching reused the event-title matcher, which strips filler

@@ -21,7 +21,7 @@ import { applyChangeToEvent } from './updates';
 import { parseUpdate } from './updateParsing';
 import { parseCommand } from '../parser';
 import { confirmDelete } from './deletes';
-import { confirmMessage } from './messages';
+import { confirmMessage, startMessage } from './messages';
 import {
   readChannelChoice,
   readChoice,
@@ -138,6 +138,21 @@ function pendingActionFor(
     return { kind: 'delete-scope', event: outcome.event, updatedAtMs };
   }
 
+  if (outcome.kind === 'message-unclear') {
+    // Only the two answerable reasons become a question worth remembering. A refused
+    // mail scope or an unwired channel is not something the user can answer here.
+    if (outcome.reason === 'no-recipient' || outcome.reason === 'no-body') {
+      return {
+        kind: 'compose-message',
+        asking: outcome.reason === 'no-recipient' ? 'recipient' : 'body',
+        ...(outcome.recipient !== undefined ? { recipient: outcome.recipient } : {}),
+        ...(outcome.body !== undefined ? { body: outcome.body } : {}),
+        updatedAtMs,
+      };
+    }
+    return undefined;
+  }
+
   if (outcome.kind === 'message-choose-channel') {
     return {
       kind: 'choose-message-channel',
@@ -226,10 +241,21 @@ async function resolvePendingAction(
   const { clock, provider } = options;
   const timeZone = clock.timeZone();
 
+  // BEFORE the recognised-command guard below, because the answer to 'מה לכתוב?' is
+  // text to send, not an instruction to obey. 'מה קורה' is a perfectly good message
+  // and must not be answered as a calendar question. See the branch for the details.
+  if (action.kind === 'compose-message' && action.asking === 'body') {
+    return composeMessage(action, text, options);
+  }
+
   // A recognised command is a change of subject, not an answer. Letting it fall
   // through drops the pending confirmation, which is the safe direction: the worst
   // case is the user has to ask to delete again.
   if (parseCommand(text, clock).intent !== 'UNKNOWN') return undefined;
+
+  if (action.kind === 'compose-message') {
+    return composeMessage(action, text, options);
+  }
 
   if (action.kind === 'confirm-suggestion') {
     const answer = readConfirmation(text);
@@ -482,6 +508,106 @@ async function resolvePendingAction(
   } catch (error) {
     return { outcome: toTurnFailure(error), state: clearPending() };
   }
+}
+
+/**
+ * Take an answer to 'למי לשלוח?' or 'מה לכתוב?' and carry the request forward.
+ *
+ * The two questions are answered by deliberately different rules:
+ *
+ *   - **The text is taken literally, always.** 'מה קורה', 'תבטל הכל' and 'תקבע פגישה'
+ *     are all things a person might genuinely want to send, so no word is treated as
+ *     an instruction here. That is the opposite of every other pending action, and it
+ *     is why this runs before the recognised-command guard.
+ *
+ *     There is no cancel word, on purpose. Any word reserved for escaping is a word
+ *     that can no longer be sent, and silently dropping a message someone meant is
+ *     worse than the alternative: the confirmation step is the escape hatch. A user
+ *     who answers 'לא, עזוב' is asked whether to send 'לא, עזוב' and says no.
+ *
+ *   - **The recipient is matched against a closed set**, so a plain no can safely mean
+ *     no — nobody is called 'לא' — and a recognised command still falls through as a
+ *     change of subject, because this branch is reached after that guard.
+ */
+async function composeMessage(
+  action: Extract<PendingAction, { kind: 'compose-message' }>,
+  text: string,
+  options: TurnOptions,
+): Promise<TurnResult> {
+  const { clock } = options;
+  const answer = text.trim();
+
+  if (action.asking === 'recipient' && readConfirmation(text) === 'no') {
+    return {
+      outcome: { kind: 'abandoned', message: 'בסדר, לא שלחתי כלום.' },
+      state: clearPending(),
+    };
+  }
+
+  const recipient = action.asking === 'recipient' ? answer : action.recipient;
+  const body = action.asking === 'body' ? answer : action.body;
+
+  // Still short of something. Ask for it and keep what we have.
+  if (recipient === undefined || recipient.length === 0) {
+    return {
+      outcome: {
+        kind: 'message-unclear',
+        reason: 'no-recipient',
+        ...(body !== undefined ? { body } : {}),
+      },
+      state: {
+        action: {
+          kind: 'compose-message',
+          asking: 'recipient',
+          ...(body !== undefined ? { body } : {}),
+          updatedAtMs: clock.now().getTime(),
+        },
+      },
+    };
+  }
+
+  if (body === undefined || body.length === 0) {
+    return {
+      outcome: { kind: 'message-unclear', reason: 'no-body', recipient },
+      state: {
+        action: {
+          kind: 'compose-message',
+          asking: 'body',
+          recipient,
+          updatedAtMs: clock.now().getTime(),
+        },
+      },
+    };
+  }
+
+  const messaging = options.messaging;
+  if (messaging === undefined) {
+    return {
+      outcome: { kind: 'message-unclear', reason: 'not-available' },
+      state: clearPending(),
+    };
+  }
+
+  // Rebuild a command and run the ordinary path, so contact matching, the channel
+  // question and the confirmation all behave exactly as they do for a one-shot
+  // request. There is no second, looser route to sending.
+  const retry: ParsedCommand = {
+    intent: 'SEND_MESSAGE',
+    recipient,
+    messageBody: body,
+    missing: [],
+    ambiguities: [],
+    confidence: 1,
+    rawText: text,
+    normalizedText: text,
+  };
+
+  const outcome = startMessage(retry, messaging);
+  const followUp = pendingActionFor(outcome, retry, clock);
+
+  return followUp !== undefined
+    ? { outcome, state: { action: followUp } }
+    : { outcome, state: clearPending() };
 }
 
 function toTurnFailure(error: unknown): CommandOutcome {
