@@ -159,7 +159,16 @@ export const MESSAGE_NOUNS = new Set([
  * the plain ש of 'שלום'. A blocklist of ש-initial nouns would be endless; asking what
  * follows the ש is decidable.
  */
+/*
+ * Note that ש followed by a ה-definite word ('שהפגישה', 'שהיה', 'שהולך') is already
+ * handled by the two-letter 'שה' reading, so only openers that do NOT start with ה
+ * need to be listed here.
+ *
+ * Every entry is checked against the risk of a real ש-word: 'אלה' is deliberately
+ * absent because 'שאלה' is a question, and 'רק' because 'שרק' is a word.
+ */
 export const CLAUSE_OPENERS = new Set([
+  // Pronouns
   'אני',
   'אנחנו',
   'אתה',
@@ -168,15 +177,32 @@ export const CLAUSE_OPENERS = new Set([
   'היא',
   'הם',
   'הן',
+  'מישהו',
+  'משהו',
+  'כולם',
+  // Demonstratives, all three genders/numbers — a message very often opens with one.
+  'זה',
+  'זאת',
+  'זו',
+  // Existentials and negation
   'יש',
   'אין',
   'לא',
-  'כבר',
-  'זה',
+  // Common verb and adverb openers
   'צריך',
   'צריכה',
   'אפשר',
   'נראה',
+  'רוצה',
+  'יכול',
+  'חייב',
+  'מגיע',
+  'קרה',
+  'נגמר',
+  'כבר',
+  'עדיין',
+  'אולי',
+  'באמת',
   'מחר',
   'היום',
   'הכל',

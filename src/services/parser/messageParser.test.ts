@@ -99,8 +99,22 @@ describe('the message body is verbatim', () => {
     expect(parse('תשלח לאמא שאני מאחר.').messageBody).toBe('אני מאחר');
   });
 
-  it('does not strip a ש that is part of the word', () => {
-    expect(parse('תשלח לדניאל שלום').messageBody).toBe('שלום');
+  it.each([
+    ['תשלח לאני שזאת בדיקה', 'זאת בדיקה'],
+    ['תשלח לאמא שזו טעות', 'זו טעות'],
+    ['תשלח לדניאל שכבר יצאתי', 'כבר יצאתי'],
+    ['תשלח לאמא שהיה כיף', 'היה כיף'],
+    ['תשלח לדניאל שמשהו קרה', 'משהו קרה'],
+  ])('strips the complementizer in %s', (text, body) => {
+    expect(parse(text).messageBody).toBe(body);
+  });
+
+  it.each([
+    ['תשלח לדניאל שלום', 'שלום'],
+    ['תשלח לדניאל שאלה', 'שאלה'],
+    ['תשלח לאמא שבת שלום', 'שבת שלום'],
+  ])('does not strip a ש that is part of the word in %s', (text, body) => {
+    expect(parse(text).messageBody).toBe(body);
   });
 
   it('is always a substring of the normalized text', () => {

@@ -105,6 +105,16 @@ describe('nothing is sent without confirmation', () => {
 });
 
 describe('choosing the recipient', () => {
+  it('finds a contact whose name is an ordinary Hebrew word', async () => {
+    // Regression: contact matching reused the event-title matcher, which strips filler
+    // words. A contact called 'אני' filtered down to nothing and was unreachable.
+    const self = stub([{ id: 'me', name: 'אני', email: 'me@example.com' }]);
+    const { replies, sendMail } = await converse(['תשלח לאני שזאת בדיקה'], self);
+
+    expect(replies[0]).toBe('לשלוח במייל לאני: "זאת בדיקה"?');
+    expect(sendMail).not.toHaveBeenCalled();
+  });
+
   it('SENDS NOTHING when no contact matches', async () => {
     const { replies, sendMail } = await converse(['תשלח ליוסי שאני מאחר']);
 

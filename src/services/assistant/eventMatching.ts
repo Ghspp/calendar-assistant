@@ -12,8 +12,13 @@ import type { CalendarEvent } from '../../types/calendar';
 import { TITLE_FILLERS } from '../parser/lexicon';
 import { normalizeText, tokenize } from '../parser/normalize';
 
-/** Every reading of every token, so 'הפגישה' also counts as 'פגישה'. */
-function stemsOf(text: string): Set<string> {
+/**
+ * Every reading of every token, so 'הפגישה' also counts as 'פגישה'.
+ *
+ * Exported so contact matching can share the prefix-stripping without also inheriting
+ * the filler-word filtering below, which is right for event phrases and wrong for names.
+ */
+export function stemsOf(text: string): Set<string> {
   const stems = new Set<string>();
   for (const token of tokenize(normalizeText(text))) {
     for (const form of token.forms) {
