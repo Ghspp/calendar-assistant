@@ -82,6 +82,20 @@ export type PendingAction =
       updatedAtMs: number;
     }
   /**
+   * A message is composed, but the contact can be reached two ways and which one has
+   * not been said. NOTHING has been sent.
+   *
+   * Naming a channel resolves this AND confirms, because the question quoted the
+   * message in full — so there is no second yes to collect.
+   */
+  | {
+      kind: 'choose-message-channel';
+      contact: Contact;
+      body: string;
+      channels: Array<'gmail' | 'whatsapp'>;
+      updatedAtMs: number;
+    }
+  /**
    * A message is composed and waiting for a yes. NOTHING has been sent.
    *
    * The exact text is held here rather than re-derived on confirmation, so what goes

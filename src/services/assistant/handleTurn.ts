@@ -22,7 +22,12 @@ import { parseUpdate } from './updateParsing';
 import { parseCommand } from '../parser';
 import { confirmDelete } from './deletes';
 import { confirmMessage } from './messages';
-import { readChoice, readConfirmation, readSeriesScope } from '../conversation/choices';
+import {
+  readChannelChoice,
+  readChoice,
+  readConfirmation,
+  readSeriesScope,
+} from '../conversation/choices';
 import { CalendarError } from '../calendar/errors';
 import { isActionExpired, type PendingAction } from '../conversation/ConversationManager';
 import {
@@ -131,6 +136,16 @@ function pendingActionFor(
 
   if (outcome.kind === 'delete-scope') {
     return { kind: 'delete-scope', event: outcome.event, updatedAtMs };
+  }
+
+  if (outcome.kind === 'message-choose-channel') {
+    return {
+      kind: 'choose-message-channel',
+      contact: outcome.contact,
+      body: outcome.body,
+      channels: outcome.channels,
+      updatedAtMs,
+    };
   }
 
   if (outcome.kind === 'message-confirm') {
@@ -276,6 +291,46 @@ async function resolvePendingAction(
 
     try {
       const outcome = await confirmDelete(action.event, { provider, clock }, scope);
+      return { outcome, state: clearPending() };
+    } catch (error) {
+      return { outcome: toTurnFailure(error), state: clearPending() };
+    }
+  }
+
+  if (action.kind === 'choose-message-channel') {
+    if (readConfirmation(text) === 'no') {
+      return {
+        outcome: { kind: 'abandoned', message: 'בסדר, לא שלחתי כלום.' },
+        state: clearPending(),
+      };
+    }
+
+    const channel = readChannelChoice(text);
+
+    if (channel === 'unclear') {
+      // A bare 'כן' lands here too, and that is right: it answers a question that was
+      // not asked. Which channel a message goes out on is not ours to assume.
+      return {
+        outcome: {
+          kind: 'message-choose-channel',
+          contact: action.contact,
+          body: action.body,
+          channels: action.channels,
+        },
+        state: { action: { ...action, updatedAtMs: clock.now().getTime() } },
+      };
+    }
+
+    const messaging = options.messaging;
+    if (messaging === undefined) {
+      return {
+        outcome: { kind: 'message-unclear', reason: 'not-available' },
+        state: clearPending(),
+      };
+    }
+
+    try {
+      const outcome = await confirmMessage(action.contact, action.body, channel, messaging);
       return { outcome, state: clearPending() };
     } catch (error) {
       return { outcome: toTurnFailure(error), state: clearPending() };

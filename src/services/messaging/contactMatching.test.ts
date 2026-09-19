@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { channelFor, findContactsByName, nameMatches } from './contactMatching';
+import { channelsFor, findContactsByName, nameMatches } from './contactMatching';
 import type { Contact } from '../../storage/contacts';
 
 describe('a name is never filtered down to nothing', () => {
@@ -73,18 +73,27 @@ describe('findContactsByName', () => {
   });
 });
 
-describe('channelFor', () => {
-  it('prefers email, because it is the only one that actually sends', () => {
+describe('channelsFor', () => {
+  it('reports BOTH when the contact has both, so the caller can ask', () => {
+    // Returning one here would bury a choice the user should be making.
     expect(
-      channelFor({ id: '1', name: 'א', email: 'a@example.com', phone: '972500000000' }),
-    ).toBe('gmail');
+      channelsFor({ id: '1', name: 'א', email: 'a@example.com', phone: '972500000000' }),
+    ).toEqual(['gmail', 'whatsapp']);
   });
 
-  it('falls back to WhatsApp', () => {
-    expect(channelFor({ id: '1', name: 'א', phone: '972500000000' })).toBe('whatsapp');
+  it('reports just mail', () => {
+    expect(channelsFor({ id: '1', name: 'א', email: 'a@example.com' })).toEqual(['gmail']);
   });
 
-  it('reports no channel rather than pretending', () => {
-    expect(channelFor({ id: '1', name: 'א' })).toBe('none');
+  it('reports just WhatsApp', () => {
+    expect(channelsFor({ id: '1', name: 'א', phone: '972500000000' })).toEqual(['whatsapp']);
+  });
+
+  it('reports nothing rather than pretending', () => {
+    expect(channelsFor({ id: '1', name: 'א' })).toEqual([]);
+  });
+
+  it('ignores empty strings, which storage can hand back', () => {
+    expect(channelsFor({ id: '1', name: 'א', email: '', phone: '' })).toEqual([]);
   });
 });

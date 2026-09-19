@@ -188,6 +188,18 @@ export type CommandOutcome =
       body: string;
       channel: 'gmail' | 'whatsapp';
     }
+  /**
+   * The contact can be reached two ways, so the question names both. NOTHING is sent.
+   *
+   * The message itself is in the question, so naming a channel both picks and
+   * confirms — one turn, and still nothing decided on the user's behalf.
+   */
+  | {
+      kind: 'message-choose-channel';
+      contact: Contact;
+      body: string;
+      channels: Array<'gmail' | 'whatsapp'>;
+    }
   /** The message went out by itself. Only reachable after an explicit confirmation. */
   | { kind: 'message-sent'; contact: Contact; body: string }
   /**

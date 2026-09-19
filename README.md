@@ -460,9 +460,15 @@ Two channels, chosen per contact:
 
 | The contact has | What happens |
 |---|---|
-| An email address | Sent automatically from your own Gmail address. Nothing else to do. |
+| Only an email address | Sent automatically from your own Gmail address. Nothing else to do. |
 | Only a phone number | WhatsApp opens with the message already typed. **You press send.** |
+| Both | It asks — *"במייל או בוואטסאפ?"* — quoting the message, so naming a channel both picks and confirms in one turn. |
 | Neither | The assistant says so and sends nothing. |
+
+Mail does not silently win over WhatsApp when a contact has both. The two are not
+interchangeable — one sends by itself, the other lands on a phone the recipient may check
+sooner — and which is wanted depends on the message, not on the contact. A bare `כן` to that
+question is treated as unclear and re-asked, because it answers a question that was not put.
 
 **Why WhatsApp is not automatic.** There is no free — or paid — way to send from your personal
 WhatsApp account out of a browser. The Business Cloud API sends from a separate business number

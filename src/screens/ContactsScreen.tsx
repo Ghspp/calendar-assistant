@@ -23,6 +23,7 @@ import { pickDeviceContacts, supportsContactPicker } from '../services/messaging
  */
 
 function channelLabel(contact: Contact): string {
+  if (contact.email !== undefined && contact.phone !== undefined) return 'תישאל בכל פעם';
   if (contact.email !== undefined) return 'נשלח במייל';
   if (contact.phone !== undefined) return 'וואטסאפ — בלחיצה אחת';
   return 'אין לאן לשלוח';
@@ -93,8 +94,8 @@ export default function ContactsScreen() {
   return (
     <section className="contacts">
       <p className="hint">
-        למי שיש מייל — ההודעה נשלחת לבד. למי שיש רק טלפון — וואטסאפ נפתח עם ההודעה מוכנה
-        ואתה לוחץ שלח. אנשי הקשר נשמרים רק במכשיר הזה.
+        מייל נשלח לבד. טלפון פותח את וואטסאפ עם ההודעה מוכנה ואתה לוחץ שלח. למי שיש
+        שניהם — תישאל בכל פעם במה לשלוח. אנשי הקשר נשמרים רק במכשיר הזה.
       </p>
 
       {supportsContactPicker() ? (

@@ -459,6 +459,11 @@ export function respond(outcome: CommandOutcome, clock: Clock): string {
       return `לשלוח ${how}: "${outcome.body}"?`;
     }
 
+    case 'message-choose-channel':
+      // The message is quoted in full here, so naming a channel is a real, informed
+      // confirmation — there is no second question to ask afterwards.
+      return `לשלוח ל${outcome.contact.name}: "${outcome.body}" — במייל או בוואטסאפ?`;
+
     case 'message-sent':
       return `שלחתי ל${outcome.contact.name}.`;
 

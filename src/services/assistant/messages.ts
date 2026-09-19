@@ -19,7 +19,7 @@
 import type { ParsedCommand } from '../../types/parser';
 import type { Contact } from '../../storage/contacts';
 import type { GmailChannel } from '../messaging/GmailChannel';
-import { channelFor, findContactsByName } from '../messaging/contactMatching';
+import { channelsFor, findContactsByName } from '../messaging/contactMatching';
 import { buildWhatsAppUrl } from '../messaging/whatsappLink';
 import type { CommandOutcome } from './types';
 
@@ -70,14 +70,26 @@ export function startMessage(
   const contact = matches[0];
   if (contact === undefined) return { kind: 'message-contact-not-found', name };
 
-  const channel = channelFor(contact);
-  if (channel === 'none') {
-    return { kind: 'message-no-channel', contact };
+  // A channel the current Google grant cannot actually use is not on offer. Listing
+  // it would invite the user to pick something that then fails.
+  const channels = channelsFor(contact).filter(
+    (channel) => channel !== 'gmail' || options.canSendMail !== false,
+  );
+
+  if (channels.length === 0) {
+    // Distinguish 'no way to reach them' from 'the one way needs a permission you
+    // refused', because the two need completely different things from the user.
+    return channelsFor(contact).includes('gmail')
+      ? { kind: 'message-unclear', reason: 'no-mail-permission' }
+      : { kind: 'message-no-channel', contact };
   }
 
-  if (channel === 'gmail' && options.canSendMail === false) {
-    return { kind: 'message-unclear', reason: 'no-mail-permission' };
+  if (channels.length > 1) {
+    return { kind: 'message-choose-channel', contact, body, channels };
   }
+
+  const channel = channels[0];
+  if (channel === undefined) return { kind: 'message-no-channel', contact };
 
   return { kind: 'message-confirm', contact, body, channel };
 }

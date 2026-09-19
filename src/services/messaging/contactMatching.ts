@@ -45,17 +45,21 @@ export function findContactsByName(
   return contacts.filter((contact) => nameMatches(contact.name, query));
 }
 
-/** How a contact can be reached, if at all. */
-export type ContactChannel = 'gmail' | 'whatsapp' | 'none';
+export type ContactChannel = 'gmail' | 'whatsapp';
 
 /**
- * Pick the channel for a contact.
+ * Every way this contact can be reached.
  *
- * Email wins when present because it is the only one that actually sends; WhatsApp
- * always leaves the user a tap to make.
+ * Returning all of them rather than picking one is deliberate. Mail and WhatsApp are
+ * not interchangeable — one sends by itself, the other lands on a phone the recipient
+ * may check sooner — and which is wanted depends on the message, not on the contact.
+ * So when both exist the caller asks, instead of applying a rule the user cannot see.
+ *
+ * Mail is listed first so a single-channel contact reads naturally in the reply.
  */
-export function channelFor(contact: Contact): ContactChannel {
-  if (contact.email !== undefined && contact.email.length > 0) return 'gmail';
-  if (contact.phone !== undefined && contact.phone.length > 0) return 'whatsapp';
-  return 'none';
+export function channelsFor(contact: Contact): ContactChannel[] {
+  const channels: ContactChannel[] = [];
+  if (contact.email !== undefined && contact.email.length > 0) channels.push('gmail');
+  if (contact.phone !== undefined && contact.phone.length > 0) channels.push('whatsapp');
+  return channels;
 }

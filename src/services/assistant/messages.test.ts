@@ -142,6 +142,84 @@ describe('choosing the recipient', () => {
   });
 });
 
+describe('a contact reachable both ways', () => {
+  const BOTH: Contact = {
+    id: 'c9',
+    name: 'יעל',
+    email: 'yael@example.com',
+    phone: '972521111111',
+  };
+
+  it('ASKS which channel instead of applying a hidden rule', async () => {
+    const { replies, sendMail } = await converse(['תשלח ליעל שאני בדרך'], stub([BOTH]));
+
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(replies[0]).toBe('לשלוח ליעל: "אני בדרך" — במייל או בוואטסאפ?');
+  });
+
+  it('quotes the message in the question, so naming a channel is a real confirmation', async () => {
+    const { replies } = await converse(['תשלח ליעל שאני מאחר בעשרים דקות'], stub([BOTH]));
+    expect(replies[0]).toContain('אני מאחר בעשרים דקות');
+  });
+
+  it('sends by mail on "במייל", with no second question', async () => {
+    const setup = stub([BOTH]);
+    const { replies, sendMail } = await converse(['תשלח ליעל שאני בדרך', 'במייל'], setup);
+
+    expect(sendMail).toHaveBeenCalledOnce();
+    expect(sendMail).toHaveBeenCalledWith('yael@example.com', 'אני בדרך');
+    expect(replies[1]).toBe('שלחתי ליעל.');
+  });
+
+  it.each(['בוואטסאפ', 'וואטסאפ', 'וואצאפ', 'ווטסאפ'])(
+    'hands off to WhatsApp on %s',
+    async (answer) => {
+      const setup = stub([BOTH]);
+      const { replies, sendMail } = await converse(['תשלח ליעל שאני בדרך', answer], setup);
+
+      expect(sendMail).not.toHaveBeenCalled();
+      expect(replies[1]).toContain('לחץ שלח');
+    },
+  );
+
+  it('SENDS NOTHING on a bare "כן", because that answers a question nobody asked', async () => {
+    const { replies, sendMail } = await converse(['תשלח ליעל שאני בדרך', 'כן'], stub([BOTH]));
+
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(replies[1]).toContain('במייל או בוואטסאפ');
+  });
+
+  it('SENDS NOTHING when the answer names both', async () => {
+    const { sendMail, replies } = await converse(
+      ['תשלח ליעל שאני בדרך', 'מייל או וואטסאפ'],
+      stub([BOTH]),
+    );
+
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(replies[1]).toContain('במייל או בוואטסאפ');
+  });
+
+  it('SENDS NOTHING on a refusal', async () => {
+    const { replies, sendMail } = await converse(['תשלח ליעל שאני בדרך', 'לא'], stub([BOTH]));
+
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(replies[1]).toBe('בסדר, לא שלחתי כלום.');
+  });
+
+  it('does not ask when the mail scope was refused — only WhatsApp is on offer', async () => {
+    const setup = stub([BOTH]);
+    const result = await handleTurn('תשלח ליעל שאני בדרך', {
+      provider: setup.provider,
+      clock: CLOCK,
+      state: emptyConversation,
+      messaging: { contacts: setup.contacts, gmail: setup.gmail, canSendMail: false },
+    });
+
+    expect(respond(result.outcome, CLOCK)).toContain('בוואטסאפ');
+    expect(respond(result.outcome, CLOCK)).not.toContain('במייל או');
+  });
+});
+
 describe('the WhatsApp fallback', () => {
   it('hands off instead of sending, and says so honestly', async () => {
     const { replies, sendMail } = await converse(['תשלח לדניאל שאני בדרך', 'כן']);

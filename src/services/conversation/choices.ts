@@ -39,6 +39,32 @@ export type SeriesScope = 'instance' | 'series' | 'unclear';
 const INSTANCE_WORDS = new Set(['זה', 'הזה', 'הפעם', 'המופע', 'אחד', 'היום', 'מחר']);
 const SERIES_WORDS = new Set(['הסדרה', 'סדרה', 'הכל', 'הכול', 'כולם', 'תמיד', 'כולן']);
 
+/** Which way to send a message, when the contact can be reached both ways. */
+export type ChannelChoice = 'gmail' | 'whatsapp' | 'unclear';
+
+const MAIL_WORDS = new Set(['מייל', 'אימייל', 'מיל', 'דואר', 'איימייל', 'mail', 'email', 'gmail']);
+
+/**
+ * WhatsApp, spelled every way Hebrew speech recognition renders it.
+ *
+ * The transcriber is inconsistent about the צ/ט and about how many vavs it uses, and
+ * a spelling that is missing here reads as 'unclear' and makes the assistant ask
+ * again — so the list is deliberately generous.
+ */
+const WHATSAPP_WORDS = new Set([
+  'וואטסאפ',
+  'ווטסאפ',
+  'וואצאפ',
+  'ווצאפ',
+  'ואטסאפ',
+  'ואצאפ',
+  'וואטסאף',
+  'וואטס',
+  'ווטס',
+  'whatsapp',
+  'wa',
+]);
+
 /**
  * Read an answer to 'this occurrence, or the whole series?'.
  *
@@ -59,6 +85,27 @@ export function readSeriesScope(text: string): SeriesScope {
 
   if (saysSeries && !saysInstance) return 'series';
   if (saysInstance && !saysSeries) return 'instance';
+  return 'unclear';
+}
+
+/**
+ * Read 'במייל' or 'בוואטסאפ' as an answer.
+ *
+ * Naming a channel is itself the confirmation to send, so this deliberately does NOT
+ * fall back to either side: mentioning both, or neither, is 'unclear' and the
+ * assistant asks again rather than choosing where someone's message goes.
+ */
+export function readChannelChoice(text: string): ChannelChoice {
+  const tokens = tokenize(normalizeText(text));
+
+  const has = (words: ReadonlySet<string>): boolean =>
+    tokens.some((token) => token.forms.some((form) => words.has(form.stem)));
+
+  const saysMail = has(MAIL_WORDS);
+  const saysWhatsApp = has(WHATSAPP_WORDS);
+
+  if (saysMail && !saysWhatsApp) return 'gmail';
+  if (saysWhatsApp && !saysMail) return 'whatsapp';
   return 'unclear';
 }
 
