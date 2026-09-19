@@ -46,6 +46,8 @@ jobs:
           # Not a secret — it ships in the bundle — but it is specific to your Google
           # Cloud project, so it lives in repository variables rather than in git.
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          # Increases by one on every publish, so the footer says which build is live.
+          APP_VERSION: ${{ github.run_number }}
         run: npm run build
 
       - uses: actions/configure-pages@v5

@@ -101,7 +101,7 @@ export default function CalendarScreen() {
       {calendar.error !== undefined ? (
         <p className="assistant__offline">{calendar.error}</p>
       ) : null}
-      {calendar.loading ? <p className="devpanel__hint">טוען…</p> : null}
+      {calendar.loading ? <p className="hint">טוען…</p> : null}
       {notice !== undefined ? <p className="assistant__offline">{notice}</p> : null}
 
       {range === 'day' ? (
@@ -246,7 +246,7 @@ function WeekAgenda({
             ))}
 
             {positioned.length === 0 && allDay.length === 0 ? (
-              <p className="devpanel__hint">אין אירועים</p>
+              <p className="hint">אין אירועים</p>
             ) : null}
 
             {positioned.map((item) => (
@@ -292,7 +292,7 @@ function EventSheet({
           {start.date} {start.time}–{end.time}
         </p>
         {event.recurringEventId !== undefined ? (
-          <p className="devpanel__hint">מופע מתוך סדרה</p>
+          <p className="hint">מופע מתוך סדרה</p>
         ) : null}
 
         {confirming ? (
@@ -381,7 +381,7 @@ function EventForm({
             <button
               key={option.minutes}
               type="button"
-              className="devpanel__preset"
+              className="chip"
               aria-pressed={duration === option.minutes}
               onClick={() => setDuration(option.minutes)}
             >

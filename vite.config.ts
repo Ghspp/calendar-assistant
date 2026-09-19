@@ -15,9 +15,15 @@ export default defineConfig({
   base,
 
   define: {
-    // Stamped at build time. A PWA serves from cache, so without this there is no way
-    // to tell whether the version on screen is the one that was just deployed.
-    __BUILD_ID__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ')),
+    /**
+     * A plain build number, shown in the footer.
+     *
+     * A PWA serves from cache, so without something visible there is no way to tell
+     * whether the screen is showing the version that was just deployed. The deploy
+     * workflow passes GitHub's run number, which increases by one each time it
+     * publishes; a local build has no such number and says so.
+     */
+    __APP_VERSION__: JSON.stringify(process.env['APP_VERSION'] ?? 'dev'),
   },
 
   plugins: [

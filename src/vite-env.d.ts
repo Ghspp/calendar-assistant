@@ -1,4 +1,4 @@
 /// <reference types="vite/client" />
 
-/** Build timestamp, injected by vite.config.ts. */
-declare const __BUILD_ID__: string;
+/** Build number, injected by vite.config.ts. 'dev' for a local build. */
+declare const __APP_VERSION__: string;

@@ -39,47 +39,6 @@
   font-weight: 600;
 }
 
-.mic-area {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-4);
-  padding-block: var(--space-7);
-}
-
-.mic-prompt {
-  font-size: var(--text-lg);
-  color: var(--color-text-muted);
-}
-
-.mic-button {
-  width: var(--mic-size);
-  height: var(--mic-size);
-  border-radius: var(--radius-full);
-  border: 0;
-  background: var(--color-accent);
-  color: var(--color-text-inverted);
-  font-size: 3rem;
-  display: grid;
-  place-items: center;
-  box-shadow: var(--shadow-md);
-  transition: transform var(--duration-base) var(--ease), opacity var(--duration-fast) var(--ease);
-}
-
-.mic-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.mic-button:not(:disabled):active {
-  transform: scale(0.95);
-}
-
-.mic-caption {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
 .panel {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -92,59 +51,4 @@
   font-size: var(--text-base);
   font-weight: 600;
   margin-block-end: var(--space-3);
-}
-
-.checklist {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
-.checklist li {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-}
-
-.checklist .mark {
-  color: var(--color-success);
-  font-weight: 700;
-}
-
-.checklist .mark--pending {
-  color: var(--color-text-muted);
-}
-
-.stage-note {
-  margin-block-start: var(--space-5);
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-warning-soft);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-  color: var(--color-text);
-}
-
-/* Temporary — entry point to the Stage 1 parser inspector. Removed with the panel. */
-.devpanel-toggle {
-  margin-block-start: var(--space-5);
-  min-height: var(--touch-min);
-  padding: var(--space-2) var(--space-4);
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-  width: 100%;
-  transition: color var(--duration-fast) var(--ease),
-    border-color var(--duration-fast) var(--ease);
-}
-
-.devpanel-toggle:hover {
-  color: var(--color-accent);
-  border-color: var(--color-accent);
 }

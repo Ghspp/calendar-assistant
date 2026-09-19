@@ -69,3 +69,51 @@ button {
   unicode-bidi: isolate;
   display: inline-block;
 }
+
+/* Small shared helpers, used across screens. */
+
+.hint {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* A pill-shaped secondary choice, as in the duration picker. */
+.chip {
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  text-align: start;
+  transition: border-color var(--duration-fast) var(--ease),
+    background var(--duration-fast) var(--ease);
+}
+
+.chip:hover {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.chip[aria-pressed='true'] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+/* Preformatted technical text. Always left-to-right, whatever the page direction. */
+.code-block {
+  padding: var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  font-family: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  direction: ltr;
+  text-align: left;
+  white-space: pre-wrap;
+}

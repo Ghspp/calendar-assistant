@@ -38,7 +38,7 @@ export default class ErrorBoundary extends Component<Props, State> {
       <main className="app-shell">
         <section className="panel" role="alert">
           <h2>משהו השתבש</h2>
-          <p className="devpanel__hint" style={{ marginBlockStart: 'var(--space-3)' }}>
+          <p className="hint" style={{ marginBlockStart: 'var(--space-3)' }}>
             האפליקציה נתקלה בשגיאה בלתי צפויה. שום דבר לא נשלח ליומן.
           </p>
           <button
@@ -49,7 +49,7 @@ export default class ErrorBoundary extends Component<Props, State> {
           >
             טען מחדש
           </button>
-          <pre className="devpanel__json" dir="ltr" style={{ marginBlockStart: 'var(--space-4)' }}>
+          <pre className="code-block" dir="ltr" style={{ marginBlockStart: 'var(--space-4)' }}>
             {error.message}
           </pre>
         </section>

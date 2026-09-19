@@ -325,7 +325,7 @@ export default function AssistantPanel() {
         <span>
           {ready ? 'מחובר ל-Google' : 'לא מחובר'}
           {' · '}
-          <span className="ltr-numerals">{__BUILD_ID__}</span>
+          גרסה <span className="ltr-numerals">{__APP_VERSION__}</span>
         </span>
         <span>
           {tts.isSupported ? (
